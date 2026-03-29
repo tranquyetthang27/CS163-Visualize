@@ -80,7 +80,7 @@ void AboutScreen::Draw() const {
                    {cx + 115, cy + 52}, 19.0f, 1.0f, Pal::TxtDark);
         DrawTextEx(fontRegular, m.id,
                    {cx + 115, cy + 82}, 15.0f, 1.0f, Pal::TxtMid);
-        DrawTextEx(fontRegular, "Ho Chi Minh City University of Technology",
+        DrawTextEx(fontRegular, "VNU-HCM, University of Science",
                    {cx + 115, cy + 108}, 12.0f, 1.0f, Pal::TxtLight);
     }
 
