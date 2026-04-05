@@ -13,3 +13,4 @@ void AudioPlayBack();        // back/exit navigation
 
 void AudioSetMusicVolume(float v);
 void AudioSetSFXVolume(float v);
+void AudioSetMusicTrack(int idx);  // 0 = no music, 1 = music1, 2 = music2
