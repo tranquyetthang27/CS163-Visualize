@@ -51,22 +51,8 @@ void AudioInit() {
     // Back: falling tone
     sndBack    = MakeSound(700.0f,  0.10f, 0.40f, 440.0f);
 
-    // Try to load background music if a file exists
-    const char* musicPaths[] = {
-        "assets/music.mp3",
-        "assets/music.ogg",
-        "assets/music.wav",
-        "../assets/music.mp3",
-    };
-    for (const char* p : musicPaths) {
-        if (FileExists(p)) {
-            bgMusic     = LoadMusicStream(p);
-            musicLoaded = true;
-            SetMusicVolume(bgMusic, gSettings.musicVolume);
-            PlayMusicStream(bgMusic);
-            break;
-        }
-    }
+    // Load background music based on saved track selection
+    AudioSetMusicTrack(gSettings.musicTrackIdx);
 }
 
 void AudioUnload() {
@@ -98,4 +84,29 @@ void AudioSetMusicVolume(float v) {
 
 void AudioSetSFXVolume(float v) {
     gSettings.sfxVolume = v;
+}
+
+void AudioSetMusicTrack(int idx) {
+    gSettings.musicTrackIdx = idx;
+    if (musicLoaded) {
+        StopMusicStream(bgMusic);
+        UnloadMusicStream(bgMusic);
+        musicLoaded = false;
+    }
+    if (idx == 0) return;  // no music
+
+    const char* trackPaths[] = {
+        nullptr,
+        "assets/music/music1.mp3",
+        "assets/music/music2.mp3",
+    };
+    if (idx >= 1 && idx <= 2) {
+        const char* p = trackPaths[idx];
+        if (p && FileExists(p)) {
+            bgMusic     = LoadMusicStream(p);
+            musicLoaded = true;
+            SetMusicVolume(bgMusic, gSettings.musicVolume);
+            PlayMusicStream(bgMusic);
+        }
+    }
 }
