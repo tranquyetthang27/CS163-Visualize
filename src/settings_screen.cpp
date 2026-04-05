@@ -59,7 +59,10 @@ void Slider::Draw() const {
 
 SettingsScreen::SettingsScreen()
     : sliderMusic({240, 220, 480, 10}, gSettings.musicVolume, "Music Volume"),
-      sliderSFX  ({240, 310, 480, 10}, gSettings.sfxVolume,   "Sound Effects Volume"),
+      sliderSFX  ({240, 300, 480, 10}, gSettings.sfxVolume,   "Sound Effects Volume"),
+      btnNoMusic ({240, 362, 130, 36}, "No Music",   Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnMusic1  ({385, 362, 130, 36}, "Music 1",    Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnMusic2  ({530, 362, 130, 36}, "Music 2",    Pal::BtnNeutral, Pal::BtnNeutHov),
       btnBack    ({40,  640, 130, 44}, "< Back",    Pal::BtnNeutral, Pal::BtnNeutHov),
       btnTestSFX ({750, 640, 160, 44}, "Test Sound", Pal::BtnOrange,  Pal::BtnOrangeHov),
       prevBgIdx(gSettings.bgColorIdx)
@@ -75,8 +78,13 @@ Screen SettingsScreen::Update() {
     if (sliderMusic.Update()) AudioSetMusicVolume(sliderMusic.value);
     if (sliderSFX.Update())   AudioSetSFXVolume(sliderSFX.value);
 
+    // Music track selection
+    if (btnNoMusic.Update()) { AudioSetMusicTrack(0); AudioPlayClick(); }
+    if (btnMusic1.Update())  { AudioSetMusicTrack(1); AudioPlayClick(); }
+    if (btnMusic2.Update())  { AudioSetMusicTrack(2); AudioPlayClick(); }
+
     // Background color swatches
-    float swatchX = 240.0f, swatchY = 430.0f;
+    float swatchX = 240.0f, swatchY = 460.0f;
     float sw = 70.0f, sh = 44.0f, sgap = 14.0f;
     for (int i = 0; i < AppSettings::bgColorCount; i++) {
         Rectangle r = {swatchX + i * (sw + sgap), swatchY, sw, sh};
@@ -111,13 +119,29 @@ void SettingsScreen::Draw() const {
     sliderMusic.Draw();
     sliderSFX.Draw();
 
+    // Music track selection
+    DrawTextEx(fontBold, "Music Track", {240, 336}, 15.0f, 1.0f, Pal::TxtDark);
+
+    // Highlight selected track button
+    auto drawTrackBtn = [&](const Button& btn, int trackIdx) {
+        if (gSettings.musicTrackIdx == trackIdx) {
+            Rectangle r = btn.rect;
+            DrawRectangleRounded({r.x - 3, r.y - 3, r.width + 6, r.height + 6},
+                                 0.3f, 6, Pal::Indigo);
+        }
+        btn.Draw();
+    };
+    drawTrackBtn(btnNoMusic, 0);
+    drawTrackBtn(btnMusic1,  1);
+    drawTrackBtn(btnMusic2,  2);
+
     btnTestSFX.Draw();
 
     // Section: Background Color
-    DrawTextEx(fontBold, "Background Color", {240, 386}, 18.0f, 1.0f, Pal::Indigo);
-    DrawLineEx({240, 409}, {840, 409}, 1.0f, Pal::Border);
+    DrawTextEx(fontBold, "Background Color", {240, 420}, 18.0f, 1.0f, Pal::Indigo);
+    DrawLineEx({240, 443}, {840, 443}, 1.0f, Pal::Border);
 
-    float swatchX = 240.0f, swatchY = 430.0f;
+    float swatchX = 240.0f, swatchY = 460.0f;
     float sw = 70.0f, sh = 44.0f, sgap = 14.0f;
 
     for (int i = 0; i < AppSettings::bgColorCount; i++) {
@@ -139,8 +163,8 @@ void SettingsScreen::Draw() const {
     }
 
     // Preview
-    DrawTextEx(fontRegular, "Preview:", {240, 502}, 14.0f, 1.0f, Pal::TxtMid);
-    Rectangle preview = {340, 497, 200, 36};
+    DrawTextEx(fontRegular, "Preview:", {240, 532}, 14.0f, 1.0f, Pal::TxtMid);
+    Rectangle preview = {340, 527, 200, 36};
     DrawRectangleRounded(preview, 0.2f, 6, gSettings.GetBG());
     DrawRectangleRoundedLines(preview, 0.2f, 6, Pal::Border);
 }
