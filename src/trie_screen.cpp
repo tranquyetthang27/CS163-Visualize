@@ -18,219 +18,234 @@ TrieScreen::TrieScreen()
       btnBack   ({20,  20,  100, 36}, "< Back",  Pal::BtnNeutral, Pal::BtnNeutHov),
       msgTimer(0), msgColor(Pal::BtnSuccess), root(0)
 {
-    pool.emplace_back('$');   // root node
-    pool[0].x = 640; pool[0].y = TRIE_TOP_Y; pool[0].alpha = 1.0f;
+    pool.emplace_back('$');   
+    pool[0].x = pool[0].targetX = 640; 
+    pool[0].y = pool[0].targetY = TRIE_TOP_Y; 
+    pool[0].alpha = 1.0f;
 }
 
 void TrieScreen::SetMsg(const char* msg, Color c, float dur) {
     message = msg; msgColor = c; msgTimer = dur;
 }
 
-int TrieScreen::CountLeaves(int node) const {
+int TrieScreen::UpdateLeafCount(int node) {
+    if (node == -1) return 0;
     int cnt = 0;
-    for (int i = 0; i < 26; i++)
-        if (pool[node].children[i] != -1)
-            cnt += CountLeaves(pool[node].children[i]);
-    return cnt == 0 ? 1 : cnt;
+    bool isLeaf = true;
+    for (int i = 0; i < 26; i++) {
+        if (pool[node].children[i] != -1) {
+            cnt += UpdateLeafCount(pool[node].children[i]);
+            isLeaf = false;
+        }
+    }
+    pool[node].leafCount = isLeaf ? 1 : cnt;
+    return pool[node].leafCount;
 }
 
 void TrieScreen::LayoutSubtree(int node, float x, float y, float spread) {
-    pool[node].x = x;
-    pool[node].y = y;
-
+    pool[node].targetX = x; 
+    pool[node].targetY = y; 
+    
     float childY = y + TRIE_DY;
-    int childCount = 0;
-    for (int i = 0; i < 26; i++)
-        if (pool[node].children[i] != -1) childCount++;
-    if (childCount == 0) return;
-
-    // Distribute children by leaf count
-    int totalLeaves = 0;
-    for (int i = 0; i < 26; i++)
-        if (pool[node].children[i] != -1)
-            totalLeaves += CountLeaves(pool[node].children[i]);
+    int totalLeaves = pool[node].leafCount;
 
     float curX = x - spread / 2.0f;
     for (int i = 0; i < 26; i++) {
         int c = pool[node].children[i];
         if (c == -1) continue;
-        int leaves = CountLeaves(c);
-        float childSpread = spread * leaves / totalLeaves;
+        
+        float childSpread = spread * (float)pool[c].leafCount / (float)totalLeaves;
         LayoutSubtree(c, curX + childSpread / 2.0f, childY, childSpread);
         curX += childSpread;
     }
 }
 
 void TrieScreen::Layout() {
-    // Root fixed at center top; spread based on leaf count
-    int leaves = CountLeaves(root);
+    if (pool.empty()) return;
+    int leaves = UpdateLeafCount(root);
     float spread = std::max(500.0f, leaves * 70.0f);
     LayoutSubtree(root, 640.0f, TRIE_TOP_Y, spread);
-    // Fade in new nodes
-    for (auto& nd : pool)
-        if (nd.alpha < 0.01f) nd.alpha = 0.01f;
 }
 
-void TrieScreen::Insert(const std::string& word) {
-    highlightPath.clear();
-    int cur = root;
-    highlightPath.push_back(cur);
-    for (char ch : word) {
-        int idx = ch - 'a';
-        if (pool[cur].children[idx] == -1) {
-            pool[cur].children[idx] = (int)pool.size();
-            pool.emplace_back(ch);
-        }
-        cur = pool[cur].children[idx];
-        highlightPath.push_back(cur);
-    }
-    pool[cur].isEnd = true;
-    Layout();
-}
-
-bool TrieScreen::Search(const std::string& word) {
-    highlightPath.clear();
-    int cur = root;
-    highlightPath.push_back(cur);
-    for (char ch : word) {
-        int idx = ch - 'a';
-        if (pool[cur].children[idx] == -1) return false;
-        cur = pool[cur].children[idx];
-        highlightPath.push_back(cur);
-    }
-    return pool[cur].isEnd;
-}
 
 Screen TrieScreen::Update() {
     float dt = GetFrameTime();
 
-    // Animate alpha
-    for (auto& nd : pool)
+    for (auto& nd : pool) {
         nd.alpha += (1.0f - nd.alpha) * 8.0f * dt;
+        nd.x += (nd.targetX - nd.x) * 10.0f * dt;
+        nd.y += (nd.targetY - nd.y) * 10.0f * dt;
+    }
 
+    if (isAnimating || isSearching) {
+        stepTimer += dt;
+        if (stepTimer >= 0.5f) {
+            stepTimer = 0.0f;
+            if (currentIdx < (int)pendingWord.size()) {
+                int idx = pendingWord[currentIdx] - 'a';
+                if (isAnimating) {
+                    if (pool[currentNode].children[idx] == -1) {
+                        int newNodeIdx = (int)pool.size();
+                        pool.emplace_back(pendingWord[currentIdx]);
+                        pool[newNodeIdx].x = pool[currentNode].x;
+                        pool[newNodeIdx].y = pool[currentNode].y;
+                        pool[currentNode].children[idx] = newNodeIdx;
+                        Layout();
+                    }
+                    currentNode = pool[currentNode].children[idx];
+                    highlightPath.push_back(currentNode);
+                    currentIdx++;
+                } else if (isSearching) {
+                    if (pool[currentNode].children[idx] != -1) {
+                        currentNode = pool[currentNode].children[idx];
+                        highlightPath.push_back(currentNode);
+                        currentIdx++;
+                    } else {
+                        isSearching = false;
+                        SetMsg("Not Found", Pal::BtnDanger);
+                    }
+                }
+            } else {
+                if (isAnimating) {
+                    pool[currentNode].isEnd = true;
+                    SetMsg("Inserted successfully!");
+                } else if (isSearching) {
+                    if (pool[currentNode].isEnd) SetMsg("Found!", Pal::BtnSuccess);
+                    else SetMsg("Prefix exists, but word not found", Pal::BtnOrange);
+                }
+                isAnimating = isSearching = false;
+            }
+        }
+    }
+
+    if(isAnimating || isSearching)return Screen::Trie;
+    
     if (msgTimer > 0) msgTimer -= dt;
 
     if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) return Screen::Home;
 
     input.Update();
-    bool doInsert = btnInsert.Update() || (input.focused && IsKeyPressed(KEY_ENTER));
-    bool doSearch = btnSearch.Update();
-    bool doClear  = btnClear.Update();
 
-    if (doClear) {
+    bool clickInsert = btnInsert.Update() || (input.focused && IsKeyPressed(KEY_ENTER));
+    bool clickSearch = btnSearch.Update();
+    bool clickClear = btnClear.Update();
+
+    if (clickClear) {
         pool.clear();
         pool.emplace_back('$');
-        pool[0].x = 640; pool[0].y = TRIE_TOP_Y; pool[0].alpha = 1.0f;
+        pool[0].x = pool[0].targetX = 640;
+        pool[0].y = pool[0].targetY = TRIE_TOP_Y;
+        pool[0].alpha = 1.0f;
         highlightPath.clear();
         input.Clear();
+        isAnimating = isSearching = false;
         SetMsg("Trie cleared.", Pal::BtnNeutral);
         return Screen::Trie;
     }
 
-    if (doInsert && !input.IsEmpty()) {
-        std::string word = input.text;
-        for (char& c : word) c = (char)std::tolower(c);
-        // only alpha
+    if ((clickInsert || clickSearch) && !input.IsEmpty()) {
         std::string clean;
-        for (char c : word) if (std::isalpha(c)) clean += c;
-        if (clean.empty()) { SetMsg("Letters only!", Pal::BtnDanger); }
-        else if (clean.size() > 10) { SetMsg("Max 10 characters!", Pal::BtnDanger); }
-        else {
-            Insert(clean);
-            char buf[64]; snprintf(buf, sizeof(buf), "Inserted \"%s\".", clean.c_str());
-            SetMsg(buf);
-            input.Clear();
+        for (char c : input.text) if (isalpha(c)) clean += (char)tolower(c);
+        
+        if (!clean.empty()) {
+            if (clickInsert) StartInsert(clean);
+            else StartSearch(clean);
         }
-    } else if (doSearch && !input.IsEmpty()) {
-        std::string word = input.text;
-        for (char& c : word) c = (char)std::tolower(c);
-        std::string clean;
-        for (char c : word) if (std::isalpha(c)) clean += c;
-        bool found = Search(clean);
-        char buf[64]; snprintf(buf, sizeof(buf), "\"%s\" %s in trie.", clean.c_str(), found ? "FOUND" : "NOT FOUND");
-        SetMsg(buf, found ? Pal::BtnSuccess : Pal::BtnDanger);
+        input.Clear();
     }
 
     return Screen::Trie;
 }
 
-void TrieScreen::DrawAllEdges(int node) const {
-    bool onPath = false;
-    for (int p : highlightPath) if (p == node) { onPath = true; break; }
+void TrieScreen::StartInsert(const std::string& word) {
+    pendingWord = word;
+    currentIdx = 0;
+    currentNode = root;
+    isAnimating = true;
+    isSearching = false;
+    stepTimer = 0.0f;
+    highlightPath.clear();
+    highlightPath.push_back(root);
+}
 
+void TrieScreen::StartSearch(const std::string& word) {
+    pendingWord = word;
+    currentIdx = 0;
+    currentNode = root;
+    isSearching = true;
+    isAnimating = false;
+    stepTimer = 0.0f;
+    highlightPath.clear();
+    highlightPath.push_back(root);
+}
+
+
+void TrieScreen::DrawAllEdges(int node) const {
     for (int i = 0; i < 26; i++) {
         int c = pool[node].children[i];
         if (c == -1) continue;
 
+        bool onPath = false;
+        for (int p : highlightPath) if (p == node) onPath = true;
         bool childOnPath = false;
-        for (int p : highlightPath) if (p == c) { childOnPath = true; break; }
-        bool edgeHL = onPath && childOnPath;
+        for (int p : highlightPath) if (p == c) childOnPath = true;
+        bool edgeHL = onPath && childOnPath && !highlightPath.empty();
 
-        Color ec = edgeHL ? Color{255,152,0,220} : Pal::EdgeColor;
-        DrawLineEx({pool[node].x, pool[node].y},
-                   {pool[c].x,    pool[c].y}, edgeHL ? 2.5f : 1.5f, ec);
+        Color ec = edgeHL ? Color{255, 152, 0, 220} : Pal::EdgeColor;
+        ec.a = (unsigned char)(pool[c].alpha * ec.a);
+
+        DrawLineEx({pool[node].x, pool[node].y}, {pool[c].x, pool[c].y}, edgeHL ? 3.0f : 1.5f, ec);
         DrawAllEdges(c);
     }
 }
 
 void TrieScreen::DrawAllNodes(int node) const {
     bool onPath = false;
-    for (int p : highlightPath) if (p == node) { onPath = true; break; }
+    for (int p : highlightPath) if (p == node) onPath = true;
     bool isLast = !highlightPath.empty() && highlightPath.back() == node;
 
-    Color fillC  = onPath ? (isLast ? Pal::NodeFound : Pal::NodeHL) : Pal::NodeFill;
-    Color bordC  = onPath ? (isLast ? Color{36,128,54,255} : Color{200,160,0,255}) : Pal::NodeBorder;
-    Color textC  = (onPath && isLast) ? WHITE : Pal::TxtDark;
+    Color fillC = onPath ? (isLast ? Pal::NodeFound : Pal::NodeHL) : Pal::NodeFill;
+    Color bordC = onPath ? (isLast ? Color{36, 128, 54, 255} : Color{200, 160, 0, 255}) : Pal::NodeBorder;
+    Color textC = (onPath && isLast) ? WHITE : Pal::TxtDark;
 
-    unsigned char a = (unsigned char)(pool[node].alpha * 220);
+    unsigned char a = (unsigned char)(pool[node].alpha * 255);
     fillC.a = bordC.a = textC.a = a;
 
-    // End-of-word ring
     if (pool[node].isEnd) {
-        DrawCircleV({pool[node].x, pool[node].y}, NODE_R + 4,
-                    {63, 81, 181, (unsigned char)(a/2)});
+        Color ringC = {63, 81, 181, (unsigned char)(a / 2)};
+        DrawCircleV({pool[node].x, pool[node].y}, NODE_R + 5, ringC);
     }
 
     DrawCircleV({pool[node].x, pool[node].y}, NODE_R + 1.5f, bordC);
-    DrawCircleV({pool[node].x, pool[node].y}, NODE_R,        fillC);
+    DrawCircleV({pool[node].x, pool[node].y}, NODE_R, fillC);
 
-    // Character label
-    char buf[3];
-    if (pool[node].ch == '$') buf[0] = '\0';
-    else { buf[0] = (char)std::toupper(pool[node].ch); buf[1] = '\0'; }
-    if (buf[0]) {
-        Vector2 ts = MeasureTextEx(fontBold, buf, 16.0f, 1.0f);
-        DrawTextEx(fontBold, buf,
-            {pool[node].x - ts.x/2, pool[node].y - ts.y/2},
-            16.0f, 1.0f, textC);
+    if (pool[node].ch != '$') {
+        char buf[2] = { (char)std::toupper(pool[node].ch), '\0' };
+        Vector2 ts = MeasureTextEx(fontBold, buf, 18.0f, 1.0f);
+        DrawTextEx(fontBold, buf, {pool[node].x - ts.x / 2, pool[node].y - ts.y / 2}, 18.0f, 1.0f, textC);
     }
 
     for (int i = 0; i < 26; i++) {
-        int c = pool[node].children[i];
-        if (c != -1) DrawAllNodes(c);
+        if (pool[node].children[i] != -1) DrawAllNodes(pool[node].children[i]);
     }
 }
 
 void TrieScreen::Draw() const {
     ClearBackground(Pal::BG);
 
-    // Header
     DrawRectangleRec({0, 0, 1280, 72}, Pal::Surface);
     DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
-    DrawTextEx(fontBold,    "Trie",   {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
-    DrawTextEx(fontRegular, "Insert words and search prefixes",
-               {130, 52}, 13.5f, 1.0f, Pal::TxtLight);
+    DrawTextEx(fontBold, "Trie Visualization", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
+    DrawTextEx(fontRegular, "Insert words to build the tree and search prefixes", {130, 52}, 14.0f, 1.0f, Pal::TxtLight);
+    
     btnBack.Draw();
 
-    // Legend
-    DrawCircleV({820, 50}, 7, Pal::NodeFound);
-    DrawTextEx(fontRegular, "= end of word", {832, 43}, 13.0f, 1.0f, Pal::TxtMid);
+    DrawCircleV({820, 45}, 7, Pal::NodeFound);
+    DrawTextEx(fontRegular, "= End of Word", {835, 38}, 14.0f, 1.0f, Pal::TxtMid);
 
-    // Trie drawing area
     DrawAllEdges(root);
     DrawAllNodes(root);
 
-    // Bottom panel
     DrawRectangleRec({0, 616, 1280, 104}, Pal::Panel);
     DrawLineEx({0, 616}, {1280, 616}, 1.0f, Pal::Border);
 
@@ -239,14 +254,13 @@ void TrieScreen::Draw() const {
     input.Draw();
     btnSearch.Draw();
 
-    // Message
     if (msgTimer > 0 && !message.empty()) {
-        float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
-        Color c = msgColor;
-        c.a = (unsigned char)(alpha * 220);
-        DrawTextEx(fontRegular, message.c_str(), {690, 646}, 16.0f, 1.0f, c);
+        float fade = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
+        Color c = msgColor; c.a = (unsigned char)(fade * 255);
+        DrawTextEx(fontRegular, message.c_str(), {700, 646}, 18.0f, 1.0f, c);
     }
 
-    char cnt[32]; snprintf(cnt, sizeof(cnt), "Nodes: %d", (int)pool.size() - 1);
-    DrawTextEx(fontRegular, cnt, {1180, 646}, 14.0f, 1.0f, Pal::TxtLight);
+    char cnt[32];
+    snprintf(cnt, sizeof(cnt), "Total Nodes: %d", (int)pool.size());
+    DrawTextEx(fontRegular, cnt, {1140, 646}, 15.0f, 1.0f, Pal::TxtMid);
 }

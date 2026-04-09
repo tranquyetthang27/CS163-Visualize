@@ -4,15 +4,16 @@
 #include "input_field.h"
 #include <string>
 #include <vector>
-#include <array>
 
 struct TrieNode {
-    int  children[26];
+    int children[26];
     bool isEnd;
     float x, y, alpha;
-    char  ch;
+    float targetX, targetY;
+    int leafCount;
+    char ch;
 
-    TrieNode(char c = '$') : isEnd(false), x(0), y(0), alpha(0), ch(c) {
+    TrieNode(char c) : ch(c), isEnd(false), x(640), y(140), alpha(0), targetX(640), targetY(140), leafCount(0) {
         for (int i = 0; i < 26; i++) children[i] = -1;
     }
 };
@@ -25,26 +26,33 @@ class TrieScreen {
     Button btnInsert, btnSearch, btnClear, btnBack;
 
     std::string message;
-    float       msgTimer;
-    Color       msgColor;
+    float msgTimer;
+    Color msgColor;
 
-    std::vector<int> highlightPath;  // nodes on search/insert path
+    std::vector<int> highlightPath;
+
+    std::string pendingWord;
+    int currentIdx;
+    int currentNode;
+    float stepTimer;
+    bool isAnimating = false;
+    bool isSearching = false;
 
     void Layout();
     void LayoutSubtree(int node, float x, float y, float spread);
-    int  CountLeaves(int node) const;
-    void SetMsg(const char* msg, Color c = {46,160,67,255}, float dur = 2.5f);
+    int UpdateLeafCount(int node);
+    void SetMsg(const char* msg, Color c = {46, 160, 67, 255}, float dur = 2.5f);
 
 public:
     TrieScreen();
     Screen Update();
-    void   Draw() const;
+    void Draw() const;
 
 private:
-    void DrawNode(int idx) const;
-    void DrawEdges(int parent, int child) const;
     void DrawAllEdges(int node) const;
     void DrawAllNodes(int node) const;
-    void Insert(const std::string& word);
-    bool Search(const std::string& word);
+    
+    
+    void StartInsert(const std::string& word);
+    void StartSearch(const std::string& word);
 };
