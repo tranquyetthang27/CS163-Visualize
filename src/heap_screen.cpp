@@ -17,7 +17,7 @@ HeapScreen::HeapScreen()
       btnDelMax ({460, 636, 140, 40}, "Delete Max", Pal::BtnDanger,  Pal::BtnDangHov),
       btnBack   ({20,  20,  100, 36}, "< Back",     Pal::BtnNeutral, Pal::BtnNeutHov),
       msgTimer(0), msgColor(Pal::BtnSuccess),
-      animA(-1), animB(-1), animTimer(0), animDuration(0.4f), doingSwap(false)
+      animA(-1), animB(-1), animC(-1), idCurrent(0), stepTimer(0), doingInsert(false), doingDelete(false), isHighlight(false)
 {}
 
 void HeapScreen::GetNodePos(int i, float& x, float& y) const {
@@ -37,8 +37,7 @@ void HeapScreen::ComputePositions() {
         GetNodePos(i, tx, ty);
         auto& v = vis[i];
         v.tx = tx; v.ty = ty;
-        v.highlighted = (i == animA || i == animB);
-        v.swapping    = doingSwap && v.highlighted;
+        v.highlighted = (i == animA || i == animB || i == animC);
         if (v.alpha < 0.01f) {
             v.x = tx; v.y = ty;   // init
             v.alpha = 0.01f;
@@ -60,17 +59,81 @@ Screen HeapScreen::Update() {
         v.alpha += (1.0f - v.alpha) * 8.0f * dt;
     }
 
-    // Animation countdown
-    if (animTimer > 0) {
-        animTimer -= dt;
-        if (animTimer <= 0) {
-            animA = animB = -1;
-            doingSwap = false;
-            ComputePositions();
+    if(doingInsert || doingDelete){
+        stepTimer += dt;
+        if(stepTimer < 0.5f)return Screen::Heap;
+        stepTimer = 0;
+        if(doingInsert){
+            if(idCurrent == 0){
+                doingInsert = false;
+                char buf[32]; snprintf(buf, sizeof(buf), "Inserted %d.", heap[idCurrent]);
+                SetMsg(buf);
+            }
+            else{
+                int parent = (idCurrent - 1) >> 1;
+                animA = idCurrent;
+                animB = parent;
+                if(!isHighlight){
+                    ComputePositions();
+                    isHighlight = true;
+                }
+                else{
+                    if(heap[idCurrent] > heap[parent]){
+                        std::swap(heap[idCurrent], heap[parent]);
+                        std::swap(vis[idCurrent], vis[parent]);
+                        idCurrent = parent;
+                        animA = animB = animC = -1;
+                        ComputePositions();
+                        isHighlight = false;
+                    }
+                    else{
+                        doingInsert = false;
+                        char buf[32]; snprintf(buf, sizeof(buf), "Inserted %d.", heap[idCurrent]);
+                        idCurrent = 0;
+                        SetMsg(buf);
+                    }
+                }
+            }
+        }
+        if(doingDelete){
+            int n = (int)heap.size();
+            int largest = idCurrent;
+            int l = 2*idCurrent+1, r = 2*idCurrent+2;
+            animA = idCurrent, animB = l, animC = r;
+            if(!isHighlight){
+                ComputePositions();
+                isHighlight = true;
+            }
+            else{
+                if (l < n && heap[l] > heap[largest]) largest = l;
+                if (r < n && heap[r] > heap[largest]) largest = r;
+                if (largest == idCurrent){
+                    animA = animB = animC = -1;
+                    idCurrent = 0;
+                    doingDelete = false;
+                    animA = animB = animC = -1;
+                    ComputePositions();
+                    char buf[32]; snprintf(buf, sizeof(buf), "Deleted max.");
+                    SetMsg(buf, Pal::BtnDanger);
+                }
+                else{
+                    std::swap(heap[idCurrent], heap[largest]);
+                    std::swap(vis[idCurrent], vis[largest]);
+                    idCurrent = largest;
+                    animA = animB = animC = -1;
+                    animA = idCurrent;
+                    animB = largest;
+                    ComputePositions();
+                    isHighlight = false;
+                }
+            }
         }
     }
 
+
     if (msgTimer > 0) msgTimer -= dt;
+
+    if(doingInsert || doingDelete)return Screen::Heap;
 
     if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) return Screen::Home;
     input.Update();
@@ -78,44 +141,29 @@ Screen HeapScreen::Update() {
     bool doIns    = btnInsert.Update() || (input.focused && IsKeyPressed(KEY_ENTER));
     bool doDelMax = btnDelMax.Update();
 
-    if (doIns && !input.IsEmpty() && animTimer <= 0) {
+    if (doIns && !input.IsEmpty() ) {
         int v; try { v = std::stoi(input.text); } catch(...) { SetMsg("Invalid number!", Pal::BtnDanger); return Screen::Heap; }
         if ((int)heap.size() >= MAX_SIZE) {
             SetMsg("Heap full (max 15)!", Pal::BtnDanger);
         } else {
             heap.push_back(v);
             // Heapify up
-            int i = (int)heap.size() - 1;
-            while (i > 0) {
-                int parent = (i - 1) / 2;
-                if (heap[i] > heap[parent]) {
-                    std::swap(heap[i], heap[parent]);
-                    i = parent;
-                } else break;
-            }
+            idCurrent = (int)heap.size() - 1;
+            isHighlight = false;
+            doingInsert = true;
             ComputePositions();
-            char buf[32]; snprintf(buf, sizeof(buf), "Inserted %d.", v);
-            SetMsg(buf);
             input.Clear();
         }
-    } else if (doDelMax && !heap.empty() && animTimer <= 0) {
+    } else if (doDelMax && !heap.empty() ) {
         int maxVal = heap[0];
         heap[0] = heap.back();
+        std::swap(vis[0], vis[(int)heap.size() - 1]);
         heap.pop_back();
         // Heapify down
-        int i = 0, n = (int)heap.size();
-        while (true) {
-            int largest = i;
-            int l = 2*i+1, r = 2*i+2;
-            if (l < n && heap[l] > heap[largest]) largest = l;
-            if (r < n && heap[r] > heap[largest]) largest = r;
-            if (largest == i) break;
-            std::swap(heap[i], heap[largest]);
-            i = largest;
-        }
+        isHighlight = false;
+        idCurrent = 0;   
+        doingDelete = true;
         ComputePositions();
-        char buf[32]; snprintf(buf, sizeof(buf), "Deleted max: %d.", maxVal);
-        SetMsg(buf, Pal::BtnDanger);
     }
 
     return Screen::Heap;
@@ -153,7 +201,7 @@ void HeapScreen::Draw() const {
         Color fillC = v.highlighted ? Pal::NodeHL : Pal::NodeFill;
         Color bordC = v.highlighted ? Color{200,160,0,255} : Pal::NodeBorder;
         Color textC = Pal::TxtDark;
-        if (i == 0 && n > 0) { fillC = Pal::Indigo; bordC = Pal::IndigoDark; textC = WHITE; }
+        // if (i == 0 && n > 0) { fillC = Pal::Indigo; bordC = Pal::IndigoDark; textC = WHITE; }
 
         unsigned char a = (unsigned char)(v.alpha * 255);
         fillC.a = bordC.a = textC.a = a;

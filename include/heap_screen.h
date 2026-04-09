@@ -12,7 +12,6 @@ struct HeapNodeVis {
     float tx, ty;     // target position
     float alpha;
     bool highlighted;
-    bool swapping;
 };
 
 class HeapScreen {
@@ -27,10 +26,14 @@ class HeapScreen {
     Color       msgColor;
 
     // Animation queue: pairs of indices to highlight swap
-    int   animA, animB;   // -1 = none
-    float animTimer;
-    float animDuration;
-    bool  doingSwap;
+    int   animA, animB, animC;   // -1 = none
+    int   idCurrent;
+
+    float stepTimer;
+
+    bool  doingInsert;
+    bool  doingDelete;
+    bool  isHighlight;
 
     static constexpr int MAX_SIZE = 15;
 
