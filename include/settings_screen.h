@@ -17,8 +17,11 @@ struct Slider {
 class SettingsScreen {
     Slider sliderMusic, sliderSFX;
     Button btnNoMusic, btnMusic1, btnMusic2;
-    Button btnBack, btnTestSFX;
-    int    prevBgIdx;
+    Button btnBack, btnTestSFX, btnOk;
+    int    origMusicIdx;
+    int    origBgIdx;
+    int    pendingMusicIdx;
+    int    pendingBgIdx;
 
 public:
     SettingsScreen();

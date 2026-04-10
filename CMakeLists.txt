@@ -23,3 +23,10 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         "${CMAKE_CURRENT_SOURCE_DIR}/fonts"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/fonts"
 )
+
+# Copy assets (music, images, etc.) next to the executable
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/assets"
+)

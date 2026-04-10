@@ -63,7 +63,7 @@ void Card::Draw() const {
     }
 }
 
-// ---- Illustration helpers ----
+//Illustration helpers
 
 static void DrawNode(float x, float y, float r, Color fill, Color border) {
     DrawCircleV({x, y}, r + 1.5f, border);

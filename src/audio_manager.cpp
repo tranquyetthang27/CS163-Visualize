@@ -1,6 +1,7 @@
 #include "audio_manager.h"
 #include "app_settings.h"
 #include <cmath>
+#include <cstdio>
 
 #ifndef PI
 #define PI 3.14159265358979f
@@ -64,7 +65,13 @@ void AudioUnload() {
 }
 
 void AudioUpdate() {
-    if (musicLoaded) UpdateMusicStream(bgMusic);
+    if (musicLoaded) {
+        UpdateMusicStream(bgMusic);
+        // If stream stopped unexpectedly (e.g. buffer underrun), restart it
+        if (!IsMusicStreamPlaying(bgMusic)) {
+            PlayMusicStream(bgMusic);
+        }
+    }
 }
 
 static void PlaySFX(Sound& s) {
@@ -95,15 +102,20 @@ void AudioSetMusicTrack(int idx) {
     }
     if (idx == 0) return;  // no music
 
-    const char* trackPaths[] = {
+    const char* relPaths[] = {
         nullptr,
         "assets/music/music1.mp3",
         "assets/music/music2.mp3",
     };
     if (idx >= 1 && idx <= 2) {
-        const char* p = trackPaths[idx];
-        if (p && FileExists(p)) {
-            bgMusic     = LoadMusicStream(p);
+        // Build absolute path from executable directory so it works
+        // regardless of the current working directory.
+        const char* appDir = GetApplicationDirectory();
+        char absPath[512];
+        snprintf(absPath, sizeof(absPath), "%s%s", appDir, relPaths[idx]);
+
+        if (FileExists(absPath)) {
+            bgMusic     = LoadMusicStream(absPath);
             musicLoaded = true;
             SetMusicVolume(bgMusic, gSettings.musicVolume);
             PlayMusicStream(bgMusic);
