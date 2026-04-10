@@ -63,35 +63,51 @@ SettingsScreen::SettingsScreen()
       btnNoMusic ({240, 362, 130, 36}, "No Music",   Pal::BtnNeutral, Pal::BtnNeutHov),
       btnMusic1  ({385, 362, 130, 36}, "Music 1",    Pal::BtnNeutral, Pal::BtnNeutHov),
       btnMusic2  ({530, 362, 130, 36}, "Music 2",    Pal::BtnNeutral, Pal::BtnNeutHov),
-      btnBack    ({40,  640, 130, 44}, "< Back",    Pal::BtnNeutral, Pal::BtnNeutHov),
-      btnTestSFX ({750, 640, 160, 44}, "Test Sound", Pal::BtnOrange,  Pal::BtnOrangeHov),
-      prevBgIdx(gSettings.bgColorIdx)
+      btnBack    ({40,  640, 130, 44}, "< Back",     Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnTestSFX ({560, 640, 160, 44}, "Test Sound", Pal::BtnOrange,  Pal::BtnOrangeHov),
+      btnOk      ({740, 640, 130, 44}, "OK",         Pal::BtnSuccess, Pal::BtnSuccHov),
+      origMusicIdx(gSettings.musicTrackIdx),
+      origBgIdx(gSettings.bgColorIdx),
+      pendingMusicIdx(gSettings.musicTrackIdx),
+      pendingBgIdx(gSettings.bgColorIdx)
 {}
 
 Screen SettingsScreen::Update() {
     if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) {
+        // Restore original settings
+        gSettings.bgColorIdx = origBgIdx;
+        AudioSetMusicTrack(origMusicIdx);
         AudioPlayBack();
         return Screen::MainMenu;
     }
+
+    if (btnOk.Update()) {
+        // Confirm current selections
+        gSettings.bgColorIdx = pendingBgIdx;
+        // Music track is already applied (preview on click), just save
+        AudioPlayClick();
+        return Screen::MainMenu;
+    }
+
     if (btnTestSFX.Update()) AudioPlaySuccess();
 
     if (sliderMusic.Update()) AudioSetMusicVolume(sliderMusic.value);
     if (sliderSFX.Update())   AudioSetSFXVolume(sliderSFX.value);
 
-    // Music track selection
-    if (btnNoMusic.Update()) { AudioSetMusicTrack(0); AudioPlayClick(); }
-    if (btnMusic1.Update())  { AudioSetMusicTrack(1); AudioPlayClick(); }
-    if (btnMusic2.Update())  { AudioSetMusicTrack(2); AudioPlayClick(); }
+    // Music track selection — apply immediately so user can preview
+    if (btnNoMusic.Update()) { AudioSetMusicTrack(0); pendingMusicIdx = 0; AudioPlayClick(); }
+    if (btnMusic1.Update())  { AudioSetMusicTrack(1); pendingMusicIdx = 1; }
+    if (btnMusic2.Update())  { AudioSetMusicTrack(2); pendingMusicIdx = 2; }
 
-    // Background color swatches
+    // Background color swatches — only update pending (preview in Draw)
     float swatchX = 240.0f, swatchY = 460.0f;
     float sw = 70.0f, sh = 44.0f, sgap = 14.0f;
     for (int i = 0; i < AppSettings::bgColorCount; i++) {
         Rectangle r = {swatchX + i * (sw + sgap), swatchY, sw, sh};
         if (CheckCollisionPointRec(GetMousePosition(), r) &&
             IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            if (gSettings.bgColorIdx != i) {
-                gSettings.bgColorIdx = i;
+            if (pendingBgIdx != i) {
+                pendingBgIdx = i;
                 AudioPlayClick();
             }
         }
@@ -122,9 +138,9 @@ void SettingsScreen::Draw() const {
     // Music track selection
     DrawTextEx(fontBold, "Music Track", {240, 336}, 15.0f, 1.0f, Pal::TxtDark);
 
-    // Highlight selected track button
+    // Highlight selected track button (based on pending selection)
     auto drawTrackBtn = [&](const Button& btn, int trackIdx) {
-        if (gSettings.musicTrackIdx == trackIdx) {
+        if (pendingMusicIdx == trackIdx) {
             Rectangle r = btn.rect;
             DrawRectangleRounded({r.x - 3, r.y - 3, r.width + 6, r.height + 6},
                                  0.3f, 6, Pal::Indigo);
@@ -136,6 +152,7 @@ void SettingsScreen::Draw() const {
     drawTrackBtn(btnMusic2,  2);
 
     btnTestSFX.Draw();
+    btnOk.Draw();
 
     // Section: Background Color
     DrawTextEx(fontBold, "Background Color", {240, 420}, 18.0f, 1.0f, Pal::Indigo);
@@ -146,7 +163,7 @@ void SettingsScreen::Draw() const {
 
     for (int i = 0; i < AppSettings::bgColorCount; i++) {
         Rectangle r = {swatchX + i * (sw + sgap), swatchY, sw, sh};
-        bool selected = (gSettings.bgColorIdx == i);
+        bool selected = (pendingBgIdx == i);
 
         // Border when selected
         if (selected) {
@@ -162,9 +179,9 @@ void SettingsScreen::Draw() const {
                    11.0f, 1.0f, Pal::TxtMid);
     }
 
-    // Preview
+    // Preview (shows pending color)
     DrawTextEx(fontRegular, "Preview:", {240, 532}, 14.0f, 1.0f, Pal::TxtMid);
     Rectangle preview = {340, 527, 200, 36};
-    DrawRectangleRounded(preview, 0.2f, 6, gSettings.GetBG());
+    DrawRectangleRounded(preview, 0.2f, 6, AppSettings::bgColors[pendingBgIdx]);
     DrawRectangleRoundedLines(preview, 0.2f, 6, Pal::Border);
 }
