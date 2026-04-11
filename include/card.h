@@ -9,6 +9,7 @@ struct Card {
     const char* desc;
     Color       accent;
     float       hoverAnim;  // 0..1
+    float       animTime;   // continuous timer for illustration animation
 
     Card() = default;
     Card(Rectangle r, Screen t,
