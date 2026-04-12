@@ -10,10 +10,10 @@ struct GNode {
 };
 
 struct GEdge {
-    int   u, v, w;
-    bool  inMST;
-    bool  skipped;   // would create cycle
-    bool  highlighted;
+    int u, v, w;
+    bool inMST;
+    bool skipped;   // would create cycle
+    bool highlighted;
 };
 
 class GraphScreen {
@@ -24,26 +24,28 @@ class GraphScreen {
     GEdge edges[GRAPH_E];
 
     // Kruskal union-find
-    int   parent[GRAPH_N];
-    int   ufRank[GRAPH_N];
-    int   sortedEdges[GRAPH_E];   // indices into edges[], sorted by weight
-    int   stepIdx;                // next edge to process
-    int   mstCost;
-    bool  mstDone;
+    int parent[GRAPH_N];
+    int ufRank[GRAPH_N];
+    int sortedEdges[GRAPH_E];   // indices into edges[], sorted by weight
+    int stepIdx;                // next edge to process
+    int mstCost;
+    bool mstDone;
 
     Button btnStep, btnReset, btnBack;
 
     std::string message;
-    float       msgTimer;
-    Color       msgColor;
+    float msgTimer;
+    Color msgColor;
 
     void ResetKruskal();
-    int  Find(int x);
+    int Find(int x);
     bool Union(int x, int y);
-    void SetMsg(const char* msg, Color c = {46,160,67,255}, float dur = 3.0f);
+    void SetMsg(const char* msg, 
+                Color c = {46, 160, 67, 255}, 
+                float dur = 3.0f);
 
 public:
     GraphScreen();
     Screen Update();
-    void   Draw() const;
+    void Draw() const;
 };
