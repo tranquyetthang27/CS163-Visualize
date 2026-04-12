@@ -22,7 +22,6 @@ GraphScreen::GraphScreen()
     nodes[4] = {560, 480, "E"};
     nodes[5] = {300, 450, "F"};
     nodes[6] = {130, 370, "G"};
-
     // 11 edges (u, v, weight)
     edges[0]  = {0, 1, 7,  false, false, false};
     edges[1]  = {0, 5, 9,  false, false, false};
@@ -46,9 +45,18 @@ GraphScreen::GraphScreen()
 }
 
 void GraphScreen::ResetKruskal() {
-    for (int i = 0; i < GRAPH_N; i++) { parent[i] = i; ufRank[i] = 0; }
-    for (int i = 0; i < GRAPH_E; i++) { edges[i].inMST = false; edges[i].skipped = false; edges[i].highlighted = false; }
-    stepIdx = 0; mstCost = 0; mstDone = false;
+    for (int i = 0; i < GRAPH_N; i++) { 
+        parent[i] = i; 
+        ufRank[i] = 0; 
+    }
+    for (int i=0; i<GRAPH_E; i++) { 
+        edges[i].inMST = false; 
+        edges[i].skipped = false; 
+        edges[i].highlighted = false; 
+    }
+    stepIdx = 0; 
+    mstCost = 0; 
+    mstDone = false;
 }
 
 int GraphScreen::Find(int x) {
@@ -59,24 +67,34 @@ int GraphScreen::Find(int x) {
 bool GraphScreen::Union(int x, int y) {
     int rx = Find(x), ry = Find(y);
     if (rx == ry) return false;
-    if (ufRank[rx] < ufRank[ry]) std::swap(rx, ry);
+    if (ufRank[rx] < ufRank[ry]) {
+        std::swap(rx, ry);
+    }
     parent[ry] = rx;
-    if (ufRank[rx] == ufRank[ry]) ufRank[rx]++;
+    if (ufRank[rx] == ufRank[ry]) {
+        ufRank[rx]++;
+    }
     return true;
 }
 
 void GraphScreen::SetMsg(const char* msg, Color c, float dur) {
-    message = msg; msgColor = c; msgTimer = dur;
+    message = msg; 
+    msgColor = c; 
+    msgTimer = dur;
 }
 
 Screen GraphScreen::Update() {
     float dt = GetFrameTime();
     if (msgTimer > 0) msgTimer -= dt;
 
-    if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) return Screen::Home;
+    if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) {
+        return Screen::Home;
+    }
 
     // Clear highlight
-    for (auto& e : edges) e.highlighted = false;
+    for (auto& e : edges) {
+        e.highlighted = false;
+    }
 
     if (btnReset.Update()) {
         ResetKruskal();
@@ -86,7 +104,8 @@ Screen GraphScreen::Update() {
     if (btnStep.Update() && !mstDone) {
         if (stepIdx >= GRAPH_E) {
             mstDone = true;
-            char buf[64]; snprintf(buf, sizeof(buf), "MST complete! Total cost = %d.", mstCost);
+            char buf[64]; 
+            snprintf(buf, sizeof(buf), "MST complete! Total cost = %d.", mstCost);
             SetMsg(buf, Pal::BtnSuccess, 60.0f);
         } else {
             int ei = sortedEdges[stepIdx++];
@@ -111,10 +130,15 @@ Screen GraphScreen::Update() {
 
             // Check if MST complete (n-1 edges)
             int mstEdges = 0;
-            for (auto& ed : edges) if (ed.inMST) mstEdges++;
+            for (auto& ed : edges) {
+                if (ed.inMST) {
+                    mstEdges++;
+                }
+            }
             if (mstEdges == GRAPH_N - 1) {
                 mstDone = true;
-                char buf[64]; snprintf(buf, sizeof(buf), "MST complete! Total cost = %d.", mstCost);
+                char buf[64]; 
+                snprintf(buf, sizeof(buf), "MST complete! Total cost = %d.", mstCost);
                 SetMsg(buf, Pal::BtnSuccess, 60.0f);
             }
         }
@@ -134,7 +158,7 @@ void GraphScreen::Draw() const {
     // Header
     DrawRectangleRec({0, 0, 1280, 72}, Pal::Surface);
     DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
-    DrawTextEx(fontBold,    "Minimum Spanning Tree",   {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
+    DrawTextEx(fontBold, "Minimum Spanning Tree", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
     DrawTextEx(fontRegular, "Kruskal's algorithm — greedy edge selection",
                {130, 52}, 13.5f, 1.0f, Pal::TxtLight);
     btnBack.Draw();
@@ -151,13 +175,17 @@ void GraphScreen::Draw() const {
         Color ec;
         float thick;
         if (e.inMST) {
-            ec = Pal::MSTEdge; thick = 3.5f;
+            ec = Pal::MSTEdge; 
+            thick = 3.5f;
         } else if (e.highlighted) {
-            ec = {100, 150, 255, 255}; thick = 2.5f;
+            ec = {100, 150, 255, 255}; 
+            thick = 2.5f;
         } else if (e.skipped) {
-            ec = {229, 57, 53, 100}; thick = 1.5f;
+            ec = {229, 57, 53, 100}; 
+            thick = 1.5f;
         } else {
-            ec = Pal::EdgeColor; thick = 1.5f;
+            ec = Pal::EdgeColor; 
+            thick = 1.5f;
         }
         DrawLineEx(a, b, thick, ec);
 
@@ -165,7 +193,12 @@ void GraphScreen::Draw() const {
         float mx = (a.x + b.x) / 2.0f + 6;
         float my = (a.y + b.y) / 2.0f - 10;
         char wbuf[8]; snprintf(wbuf, sizeof(wbuf), "%d", e.w);
-        Color wc = e.inMST ? Pal::MSTEdge : Pal::TxtMid;
+        Color wc;
+        if (e.inMST) {
+            wc = Pal::MSTEdge;
+        } else {
+            wc = Pal::TxtMid;
+        }
         DrawTextEx(fontBold, wbuf, {mx, my}, 14.0f, 1.0f, wc);
     }
 
@@ -177,7 +210,10 @@ void GraphScreen::Draw() const {
         // Check if node is part of MST so far
         bool inMst = false;
         for (auto& e : edges)
-            if (e.inMST && (e.u == i || e.v == i)) { inMst = true; break; }
+            if (e.inMST && (e.u==i || e.v==i)) {
+                inMst = true;
+                break;
+            }
 
         Color fillC = inMst ? Pal::Indigo : Pal::NodeFill;
         Color bordC = inMst ? Pal::IndigoDark : Pal::NodeBorder;
@@ -202,27 +238,61 @@ void GraphScreen::Draw() const {
         Rectangle row = {876, ry, 388, 36};
 
         Color rowBg = Pal::Panel;
-        if (e.inMST)       rowBg = {200, 240, 210, 255};
-        else if (e.skipped) rowBg = {255, 230, 230, 255};
-        else if (e.highlighted) rowBg = {220, 230, 255, 255};
+        if (e.inMST) {
+            rowBg = {200, 240, 210, 255};
+            } else if (e.skipped) {
+                rowBg = {255, 230, 230, 255};
+            } else if (e.highlighted) {
+                rowBg = {220, 230, 255, 255};
+            }
 
         DrawRectangleRounded(row, 0.2f, 6, rowBg);
 
         // Status icon
-        const char* icon = e.inMST ? "[+]" : (e.skipped ? "[x]" : (i < stepIdx ? "   " : "   "));
-        Color ic = e.inMST ? Pal::BtnSuccess : (e.skipped ? Pal::BtnDanger : Pal::TxtLight);
+        // const char* icon = e.inMST ? "[+]" : (e.skipped ? "[x]" : (i < stepIdx ? "   " : "   "));
+        const char* icon;
+        if (e.inMST) {
+            icon = "[+]";
+        } else if (e.skipped) {
+            icon = "[x]";
+        } else if (i < stepIdx) {
+            icon = "   ";
+        } else {
+            icon = "   ";
+        }
+        Color ic;
+        if (e.inMST) {
+            ic = Pal::BtnSuccess;
+        } else if (e.skipped) {
+            ic = Pal::BtnDanger;
+        } else {
+            ic = Pal::TxtLight;
+        }
         DrawTextEx(fontBold, icon, {882, ry + 10}, 13.0f, 1.0f, ic);
 
         char ebuf[32];
         snprintf(ebuf, sizeof(ebuf), "%s — %s    w = %d",
                  nodes[e.u].label, nodes[e.v].label, e.w);
-        Color tc = e.inMST ? Pal::BtnSuccess : (e.skipped ? Color{200,80,80,255} : Pal::TxtDark);
-        DrawTextEx(fontRegular, ebuf, {910, ry + 10}, 14.0f, 1.0f, tc);
+        Color tc;
+        if (e.inMST) {
+            tc = Pal::BtnSuccess;
+        } else if (e.skipped) {
+            tc = Color{200, 80, 80, 255};
+        } else {
+            tc = Pal:: TxtDark;
+        }
+        DrawTextEx(fontRegular, 
+                   ebuf, 
+                   {910, ry + 10}, 
+                   14.0f, 
+                   1.0f, 
+                   tc);
     }
 
     // MST cost summary
     if (mstCost > 0 || mstDone) {
-        char cstbuf[48]; snprintf(cstbuf, sizeof(cstbuf), "MST Cost: %d", mstCost);
+        char cstbuf[48]; 
+        snprintf(cstbuf, sizeof(cstbuf), "MST Cost: %d", mstCost);
         DrawTextEx(fontBold, cstbuf, {885, 580}, 18.0f, 1.0f,
                    mstDone ? Pal::BtnSuccess : Pal::TxtMid);
     }
@@ -239,8 +309,19 @@ void GraphScreen::Draw() const {
 
     // Message
     if (msgTimer > 0 && !message.empty()) {
-        float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
-        Color c = msgColor; c.a = (unsigned char)(alpha * 220);
-        DrawTextEx(fontRegular, message.c_str(), {20, 680}, 14.5f, 1.0f, c);
+        float alphabet;
+        if (msgTimer < 0.5f) {
+            alphabet = msgTimer / 0.5f;
+        } else {
+            alphabet = 1.0f;
+        }
+        Color c = msgColor; 
+        c.a = (unsigned char)(alphabet * 220);
+        DrawTextEx(fontRegular, 
+                   message.c_str(), 
+                   {20, 680}, 
+                   14.5f, 
+                   1.0f, 
+                   c);
     }
 }
