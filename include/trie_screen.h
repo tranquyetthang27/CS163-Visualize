@@ -22,6 +22,8 @@ class TrieScreen {
     std::vector<TrieNode> pool;
     int root;
 
+    Camera2D camera;
+
     InputField input;
     Button btnInsert, btnSearch, btnClear, btnBack;
 
@@ -46,11 +48,11 @@ class TrieScreen {
 public:
     TrieScreen();
     Screen Update();
-    void Draw() const;
+    void Draw();
 
 private:
-    void DrawAllEdges(int node) const;
-    void DrawAllNodes(int node) const;
+    void DrawAllEdges(int node);
+    void DrawAllNodes(int node);
     
     
     void StartInsert(const std::string& word);

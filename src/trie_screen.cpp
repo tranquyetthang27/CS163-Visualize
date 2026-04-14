@@ -1,6 +1,7 @@
 #include "trie_screen.h"
 #include "font.h"
 #include "colors.h"
+#include "camera.h"
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
@@ -18,11 +19,17 @@ TrieScreen::TrieScreen()
       btnBack   ({20,  20,  100, 36}, "< Back",  Pal::BtnNeutral, Pal::BtnNeutHov),
       msgTimer(0), msgColor(Pal::BtnSuccess), root(0)
 {
+    camera.target = (Vector2){ 640, TRIE_TOP_Y }; // Nhìn vào gốc của cây Trie
+    camera.offset = (Vector2){ GetScreenWidth()/2.0f, GetScreenHeight()/3.0f };
+    camera.rotation = 0.0f;
+    camera.zoom = 1.0f;
+
     pool.emplace_back('$');   
     pool[0].x = pool[0].targetX = 640; 
     pool[0].y = pool[0].targetY = TRIE_TOP_Y; 
     pool[0].alpha = 1.0f;
 }
+
 
 void TrieScreen::SetMsg(const char* msg, Color c, float dur) {
     message = msg; msgColor = c; msgTimer = dur;
@@ -70,7 +77,10 @@ void TrieScreen::Layout() {
 
 Screen TrieScreen::Update() {
     float dt = GetFrameTime();
-
+    
+    UpdateCameraZoom(camera); 
+    UpdateCameraPan(camera);
+    
     for (auto& nd : pool) {
         nd.alpha += (1.0f - nd.alpha) * 8.0f * dt;
         nd.x += (nd.targetX - nd.x) * 10.0f * dt;
@@ -180,7 +190,7 @@ void TrieScreen::StartSearch(const std::string& word) {
 }
 
 
-void TrieScreen::DrawAllEdges(int node) const {
+void TrieScreen::DrawAllEdges(int node) {
     for (int i = 0; i < 26; i++) {
         int c = pool[node].children[i];
         if (c == -1) continue;
@@ -199,7 +209,7 @@ void TrieScreen::DrawAllEdges(int node) const {
     }
 }
 
-void TrieScreen::DrawAllNodes(int node) const {
+void TrieScreen::DrawAllNodes(int node){
     bool onPath = false;
     for (int p : highlightPath) if (p == node) onPath = true;
     bool isLast = !highlightPath.empty() && highlightPath.back() == node;
@@ -230,8 +240,13 @@ void TrieScreen::DrawAllNodes(int node) const {
     }
 }
 
-void TrieScreen::Draw() const {
+void TrieScreen::Draw(){
     ClearBackground(Pal::BG);
+
+    BeginMode2D(camera);
+        DrawAllEdges(root);
+        DrawAllNodes(root);
+    EndMode2D();
 
     DrawRectangleRec({0, 0, 1280, 72}, Pal::Surface);
     DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
@@ -242,9 +257,6 @@ void TrieScreen::Draw() const {
 
     DrawCircleV({820, 45}, 7, Pal::NodeFound);
     DrawTextEx(fontRegular, "= End of Word", {835, 38}, 14.0f, 1.0f, Pal::TxtMid);
-
-    DrawAllEdges(root);
-    DrawAllNodes(root);
 
     DrawRectangleRec({0, 616, 1280, 104}, Pal::Panel);
     DrawLineEx({0, 616}, {1280, 616}, 1.0f, Pal::Border);
