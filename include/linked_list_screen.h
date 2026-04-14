@@ -19,7 +19,8 @@ class LinkedListScreen {
     std::vector<LLNode> nodes;
 
     InputField input;
-    Button btnInsHead, btnInsTail, btnDel, btnSearch, btnBack;
+    Button btnInsert, btnInsHead, btnInsTail, btnDel, btnSearch, btnBack;
+    bool   insertMenuOpen;
 
     std::string message;
     float       msgTimer;
