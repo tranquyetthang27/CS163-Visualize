@@ -85,6 +85,6 @@ void AboutScreen::Draw() const {
     }
 
     // Footer
-    DrawTextCentered(fontRegular, "Built with Raylib  •  C++17  •  2026",
+    DrawTextCentered(fontRegular, "Built with Raylib  -  C++17  -  2026",
                      666.0f, 13.0f, Pal::TxtLight);
 }
