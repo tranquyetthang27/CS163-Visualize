@@ -2,19 +2,63 @@
 #include "font.h"
 #include "colors.h"
 #include <cstdio>
-#include <cstring>
-#include <algorithm>
-#include <cmath>
+
+namespace {
+
+const char* ModeTitle(GraphInputMode mode) {
+    switch (mode) {
+        case GraphInputMode::EdgeList:        return "Edge List";
+        case GraphInputMode::AdjacencyMatrix: return "Adjacency Matrix";
+        case GraphInputMode::AdjacencyList:   return "Adjacency List";
+    }
+    return "Edge List";
+}
+
+const char* ModeHint(GraphInputMode mode) {
+    switch (mode) {
+        case GraphInputMode::EdgeList:
+            return "Enter source, destination, and weight for each edge.";
+        case GraphInputMode::AdjacencyMatrix:
+            return "Fill the matrix with weights. Use 0 for no edge.";
+        case GraphInputMode::AdjacencyList:
+            return "Type neighbors for each node in list form.";
+    }
+    return "";
+}
+
+bool DrawModeTab(Rectangle rect, const char* label, bool active) {
+    Vector2 mouse = GetMousePosition();
+    bool hovered = CheckCollisionPointRec(mouse, rect);
+    Color base = active ? Pal::BtnPrimary : Pal::Surface;
+    Color hover = active ? Pal::BtnPrimHov : Pal::PanelDark;
+    Color fill = hovered ? hover : base;
+    Color border = active ? Pal::BtnPrimary : Pal::Border;
+
+    DrawRectangleRounded(rect, 0.22f, 8, fill);
+    DrawRectangleRoundedLines(rect, 0.22f, 8, border);
+
+    Vector2 ts = MeasureTextEx(fontBold, label, 15.0f, 1.0f);
+    DrawTextEx(fontBold, label,
+               {rect.x + rect.width / 2.0f - ts.x / 2.0f, rect.y + rect.height / 2.0f - ts.y / 2.0f},
+               15.0f, 1.0f, active ? WHITE : Pal::TxtDark);
+
+    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
+
+void DrawSectionHeader(const char* title, const char* hint, float x, float y) {
+    DrawTextEx(fontBold, title, {x, y}, 18.0f, 1.0f, Pal::TxtDark);
+    DrawTextEx(fontRegular, hint, {x, y + 20.0f}, 12.8f, 1.0f, Pal::TxtLight);
+}
+
+}
 
 GraphScreen::GraphScreen()
-    : stepIdx(0), mstCost(0), mstDone(false),
-      btnStep ({20,  636, 150, 40}, "Next Step",  Pal::BtnPrimary, Pal::BtnPrimHov),
-      btnReset({185, 636, 120, 40}, "Reset",      Pal::BtnDanger,  Pal::BtnDangHov),
-      btnBack ({20,  20,  100, 36}, "< Back",     Pal::BtnNeutral, Pal::BtnNeutHov),
-      msgTimer(0), msgColor(Pal::BtnSuccess)
+    : inputMode(GraphInputMode::EdgeList),
+      btnBack({20, 20, 100, 36}, "< Back", Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnDelete({440, 636, 150, 40}, "Delete", Pal::BtnDanger, Pal::BtnDangHov),
+      btnEdit({690, 636, 150, 40}, "Edit", Pal::BtnPrimary, Pal::BtnPrimHov),
+      msgTimer(0), msgColor(Pal::TxtMid)
 {
-    // 7 nodes placed aesthetically in a 1280x720 canvas
-    // Left panel 0..860 for graph, right panel 870..1260 for edge list
     nodes[0] = {200, 200, "A"};
     nodes[1] = {450, 140, "B"};
     nodes[2] = {700, 200, "C"};
@@ -22,7 +66,7 @@ GraphScreen::GraphScreen()
     nodes[4] = {560, 480, "E"};
     nodes[5] = {300, 450, "F"};
     nodes[6] = {130, 370, "G"};
-    // 11 edges (u, v, weight)
+
     edges[0]  = {0, 1, 7,  false, false, false};
     edges[1]  = {0, 5, 9,  false, false, false};
     edges[2]  = {0, 6, 14, false, false, false};
@@ -35,293 +79,248 @@ GraphScreen::GraphScreen()
     edges[9]  = {5, 6, 2,  false, false, false};
     edges[10] = {3, 6, 9,  false, false, false};
 
-    // Sort edge indices by weight
-    for (int i = 0; i < GRAPH_E; i++) sortedEdges[i] = i;
-    std::sort(sortedEdges, sortedEdges + GRAPH_E,
-              [this](int a, int b){ return edges[a].w < edges[b].w; });
+    for (int i = 0; i < GRAPH_E; i++) {
+        float y = 334.0f + i * 25.0f;
+        edgeFromFields[i]   = InputField({892.0f, y, 46.0f, 22.0f}, "u", 2);
+        edgeToFields[i]     = InputField({948.0f, y, 46.0f, 22.0f}, "v", 2);
+        edgeWeightFields[i]  = InputField({1004.0f, y, 88.0f, 22.0f}, "w", 4);
+    }
 
-    ResetKruskal();
-    SetMsg("Press \"Next Step\" to run Kruskal's MST algorithm.", Pal::TxtMid, 60.0f);
+    for (int r = 0; r < GRAPH_N; r++) {
+        for (int c = 0; c < GRAPH_N; c++) {
+            float x = 929.0f + c * 33.0f;
+            float y = 334.0f + r * 33.0f;
+            matrixFields[r][c] = InputField({x, y, 28.0f, 22.0f}, "0", 3);
+        }
+    }
+
+    for (int i = 0; i < GRAPH_N; i++) {
+        float y = 338.0f + i * 36.0f;
+        adjListFields[i] = InputField({952.0f, y, 240.0f, 24.0f}, "neighbor,weight", 32);
+    }
+
+    SetMsg("Choose an input style on the right.", Pal::TxtMid, 60.0f);
 }
 
-void GraphScreen::ResetKruskal() {
-    for (int i = 0; i < GRAPH_N; i++) { 
-        parent[i] = i; 
-        ufRank[i] = 0; 
+void GraphScreen::ClearInputFocus() {
+    for (int i = 0; i < GRAPH_E; i++) {
+        edgeFromFields[i].focused = false;
+        edgeToFields[i].focused = false;
+        edgeWeightFields[i].focused = false;
     }
-    for (int i=0; i<GRAPH_E; i++) { 
-        edges[i].inMST = false; 
-        edges[i].skipped = false; 
-        edges[i].highlighted = false; 
+    for (int r = 0; r < GRAPH_N; r++) {
+        adjListFields[r].focused = false;
+        for (int c = 0; c < GRAPH_N; c++) {
+            matrixFields[r][c].focused = false;
+        }
     }
-    stepIdx = 0; 
-    mstCost = 0; 
-    mstDone = false;
 }
 
-int GraphScreen::Find(int x) {
-    if (parent[x] != x) parent[x] = Find(parent[x]);
-    return parent[x];
-}
-
-bool GraphScreen::Union(int x, int y) {
-    int rx = Find(x), ry = Find(y);
-    if (rx == ry) return false;
-    if (ufRank[rx] < ufRank[ry]) {
-        std::swap(rx, ry);
+void GraphScreen::SetInputMode(GraphInputMode mode) {
+    if (inputMode == mode) {
+        return;
     }
-    parent[ry] = rx;
-    if (ufRank[rx] == ufRank[ry]) {
-        ufRank[rx]++;
-    }
-    return true;
+    inputMode = mode;
+    ClearInputFocus();
+    SetMsg(ModeHint(mode), Pal::TxtMid, 3.0f);
 }
 
 void GraphScreen::SetMsg(const char* msg, Color c, float dur) {
-    message = msg; 
-    msgColor = c; 
+    message = msg;
+    msgColor = c;
     msgTimer = dur;
 }
 
 Screen GraphScreen::Update() {
     float dt = GetFrameTime();
-    if (msgTimer > 0) msgTimer -= dt;
+    if (msgTimer > 0.0f) {
+        msgTimer -= dt;
+        if (msgTimer < 0.0f) {
+            msgTimer = 0.0f;
+        }
+    }
 
     if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) {
         return Screen::Home;
     }
 
-    // Clear highlight
-    for (auto& e : edges) {
-        e.highlighted = false;
+    Rectangle tabRects[3] = {
+        {884, 146, 360, 34},
+        {884, 188, 360, 34},
+        {884, 230, 360, 34}
+    };
+
+    if (CheckCollisionPointRec(GetMousePosition(), tabRects[0]) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        SetInputMode(GraphInputMode::EdgeList);
+    }
+    if (CheckCollisionPointRec(GetMousePosition(), tabRects[1]) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        SetInputMode(GraphInputMode::AdjacencyMatrix);
+    }
+    if (CheckCollisionPointRec(GetMousePosition(), tabRects[2]) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        SetInputMode(GraphInputMode::AdjacencyList);
     }
 
-    if (btnReset.Update()) {
-        ResetKruskal();
-        SetMsg("Reset. Press \"Next Step\" to start.", Pal::TxtMid, 60.0f);
-    }
-
-    if (btnStep.Update() && !mstDone) {
-        if (stepIdx >= GRAPH_E) {
-            mstDone = true;
-            char buf[64]; 
-            snprintf(buf, sizeof(buf), "MST complete! Total cost = %d.", mstCost);
-            SetMsg(buf, Pal::BtnSuccess, 60.0f);
-        } else {
-            int ei = sortedEdges[stepIdx++];
-            GEdge& e = edges[ei];
-            e.highlighted = true;
-            if (Union(e.u, e.v)) {
-                e.inMST = true;
-                mstCost += e.w;
-                char buf[80];
-                snprintf(buf, sizeof(buf),
-                    "Added edge %s-%s (w=%d)  |  MST cost so far: %d",
-                    nodes[e.u].label, nodes[e.v].label, e.w, mstCost);
-                SetMsg(buf, Pal::BtnSuccess);
-            } else {
-                e.skipped = true;
-                char buf[80];
-                snprintf(buf, sizeof(buf),
-                    "Skipped edge %s-%s (w=%d) — would create cycle.",
-                    nodes[e.u].label, nodes[e.v].label, e.w);
-                SetMsg(buf, Pal::BtnDanger);
+    if (inputMode == GraphInputMode::EdgeList) {
+        for (int i = 0; i < GRAPH_E; i++) {
+            edgeFromFields[i].Update();
+            edgeToFields[i].Update();
+            edgeWeightFields[i].Update();
+        }
+    } else if (inputMode == GraphInputMode::AdjacencyMatrix) {
+        for (int r = 0; r < GRAPH_N; r++) {
+            for (int c = 0; c < GRAPH_N; c++) {
+                matrixFields[r][c].Update();
             }
-
-            // Check if MST complete (n-1 edges)
-            int mstEdges = 0;
-            for (auto& ed : edges) {
-                if (ed.inMST) {
-                    mstEdges++;
-                }
-            }
-            if (mstEdges == GRAPH_N - 1) {
-                mstDone = true;
-                char buf[64]; 
-                snprintf(buf, sizeof(buf), "MST complete! Total cost = %d.", mstCost);
-                SetMsg(buf, Pal::BtnSuccess, 60.0f);
-            }
+        }
+    } else {
+        for (int i = 0; i < GRAPH_N; i++) {
+            adjListFields[i].Update();
         }
     }
 
-    return Screen::MST;
-}
+    btnDelete.Update();
+    btnEdit.Update();
 
-static void DrawArrowEdge(Vector2 from, Vector2 to, float thick, Color c) {
-    DrawLineEx(from, to, thick, c);
-    // midpoint weight label handled separately
+    return Screen::MST;
 }
 
 void GraphScreen::Draw() const {
     ClearBackground(Pal::BG);
 
-    // Header
     DrawRectangleRec({0, 0, 1280, 72}, Pal::Surface);
     DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
-    DrawTextEx(fontBold, "Minimum Spanning Tree", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
-    DrawTextEx(fontRegular, "Kruskal's algorithm — greedy edge selection",
-               {130, 52}, 13.5f, 1.0f, Pal::TxtLight);
+    DrawTextEx(fontBold, "Graph Input", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
+    DrawTextEx(fontRegular, "Left side keeps the preview graph; the right side is for choosing input format.",
+               {130, 52}, 13.2f, 1.0f, Pal::TxtLight);
     btnBack.Draw();
 
-    // Divider: graph area | edge list
-    DrawLineEx({870, 72}, {870, 610}, 1.0f, Pal::Border);
+    DrawLineEx({860, 72}, {860, 610}, 1.0f, Pal::Border);
 
-    // ---- Draw edges ----
     for (int i = 0; i < GRAPH_E; i++) {
         const GEdge& e = edges[i];
         Vector2 a = {nodes[e.u].x, nodes[e.u].y};
         Vector2 b = {nodes[e.v].x, nodes[e.v].y};
 
-        Color ec;
-        float thick;
+        Color ec = Pal::EdgeColor;
+        float thick = 1.5f;
         if (e.inMST) {
-            ec = Pal::MSTEdge; 
+            ec = Pal::MSTEdge;
             thick = 3.5f;
         } else if (e.highlighted) {
-            ec = {100, 150, 255, 255}; 
+            ec = {100, 150, 255, 255};
             thick = 2.5f;
         } else if (e.skipped) {
-            ec = {229, 57, 53, 100}; 
-            thick = 1.5f;
-        } else {
-            ec = Pal::EdgeColor; 
+            ec = {229, 57, 53, 100};
             thick = 1.5f;
         }
+
         DrawLineEx(a, b, thick, ec);
 
-        // Weight label at midpoint
-        float mx = (a.x + b.x) / 2.0f + 6;
-        float my = (a.y + b.y) / 2.0f - 10;
-        char wbuf[8]; snprintf(wbuf, sizeof(wbuf), "%d", e.w);
-        Color wc;
-        if (e.inMST) {
-            wc = Pal::MSTEdge;
-        } else {
-            wc = Pal::TxtMid;
-        }
-        DrawTextEx(fontBold, wbuf, {mx, my}, 14.0f, 1.0f, wc);
+        float mx = (a.x + b.x) / 2.0f + 6.0f;
+        float my = (a.y + b.y) / 2.0f - 10.0f;
+        char wbuf[8];
+        snprintf(wbuf, sizeof(wbuf), "%d", e.w);
+        DrawTextEx(fontBold, wbuf, {mx, my}, 14.0f, 1.0f, e.inMST ? Pal::MSTEdge : Pal::TxtMid);
     }
 
-    // ---- Draw nodes ----
     float nr = 22.0f;
     for (int i = 0; i < GRAPH_N; i++) {
         const GNode& nd = nodes[i];
 
-        // Check if node is part of MST so far
         bool inMst = false;
-        for (auto& e : edges)
-            if (e.inMST && (e.u==i || e.v==i)) {
+        for (const auto& e : edges) {
+            if (e.inMST && (e.u == i || e.v == i)) {
                 inMst = true;
                 break;
             }
+        }
 
         Color fillC = inMst ? Pal::Indigo : Pal::NodeFill;
         Color bordC = inMst ? Pal::IndigoDark : Pal::NodeBorder;
         Color textC = inMst ? WHITE : Pal::TxtDark;
 
         DrawCircleV({nd.x, nd.y}, nr + 2, bordC);
-        DrawCircleV({nd.x, nd.y}, nr,     fillC);
+        DrawCircleV({nd.x, nd.y}, nr, fillC);
 
         Vector2 ts = MeasureTextEx(fontBold, nd.label, 17.0f, 1.0f);
-        DrawTextEx(fontBold, nd.label,
-            {nd.x - ts.x/2, nd.y - ts.y/2}, 17.0f, 1.0f, textC);
+        DrawTextEx(fontBold, nd.label, {nd.x - ts.x / 2.0f, nd.y - ts.y / 2.0f}, 17.0f, 1.0f, textC);
     }
 
-    // ---- Right panel: sorted edge list ----
-    DrawTextEx(fontBold, "Edges (sorted by weight):",
-               {885, 85}, 14.0f, 1.0f, Pal::TxtDark);
+    DrawRectangleRec({872, 86, 388, 516}, Pal::Panel);
+    DrawRectangleRoundedLines({872, 86, 388, 516}, 0.12f, 8, Pal::Border);
 
-    for (int i = 0; i < GRAPH_E; i++) {
-        int ei = sortedEdges[i];
-        const GEdge& e = edges[ei];
-        float ry = 112.0f + i * 42.0f;
-        Rectangle row = {876, ry, 388, 36};
+    DrawTextEx(fontBold, "Input Graph", {892, 102}, 18.0f, 1.0f, Pal::TxtDark);
+    DrawTextEx(fontRegular, "Pick one format below and type directly into the table.",
+               {892, 124}, 12.6f, 1.0f, Pal::TxtLight);
 
-        Color rowBg = Pal::Panel;
-        if (e.inMST) {
-            rowBg = {200, 240, 210, 255};
-            } else if (e.skipped) {
-                rowBg = {255, 230, 230, 255};
-            } else if (e.highlighted) {
-                rowBg = {220, 230, 255, 255};
+    Rectangle tabRects[3] = {
+        {884, 146, 360, 34},
+        {884, 188, 360, 34},
+        {884, 230, 360, 34}
+    };
+    DrawModeTab(tabRects[0], "Edge List", inputMode == GraphInputMode::EdgeList);
+    DrawModeTab(tabRects[1], "Adjacency Matrix", inputMode == GraphInputMode::AdjacencyMatrix);
+    DrawModeTab(tabRects[2], "Adjacency List", inputMode == GraphInputMode::AdjacencyList);
+
+    DrawRectangleRounded({884, 276, 360, 304}, 0.12f, 8, Pal::Surface);
+    DrawRectangleRoundedLines({884, 276, 360, 304}, 0.12f, 8, Pal::Border);
+
+    if (inputMode == GraphInputMode::EdgeList) {
+        DrawSectionHeader("Edge List", "U, V, and weight for each edge.", 902, 292);
+
+        DrawTextEx(fontBold, "#", {894, 320}, 12.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, "U", {904, 320}, 12.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, "V", {960, 320}, 12.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, "W", {1016, 320}, 12.0f, 1.0f, Pal::TxtLight);
+
+        for (int i = 0; i < GRAPH_E; i++) {
+            char rowNo[8];
+            snprintf(rowNo, sizeof(rowNo), "%02d", i + 1);
+            DrawTextEx(fontRegular, rowNo, {894, 337.0f + i * 25.0f}, 12.0f, 1.0f, Pal::TxtMid);
+            edgeFromFields[i].Draw();
+            edgeToFields[i].Draw();
+            edgeWeightFields[i].Draw();
+        }
+    } else if (inputMode == GraphInputMode::AdjacencyMatrix) {
+        DrawSectionHeader("Adjacency Matrix", "Rows and columns use nodes A through G.", 902, 292);
+
+        for (int c = 0; c < GRAPH_N; c++) {
+            char label[4];
+            snprintf(label, sizeof(label), "%c", nodes[c].label[0]);
+            DrawTextEx(fontBold, label, {936.0f + c * 33.0f, 322}, 12.0f, 1.0f, Pal::TxtLight);
+        }
+
+        for (int r = 0; r < GRAPH_N; r++) {
+            char label[4];
+            snprintf(label, sizeof(label), "%c", nodes[r].label[0]);
+            DrawTextEx(fontBold, label, {905, 339.0f + r * 33.0f}, 12.0f, 1.0f, Pal::TxtLight);
+            for (int c = 0; c < GRAPH_N; c++) {
+                matrixFields[r][c].Draw();
             }
-
-        DrawRectangleRounded(row, 0.2f, 6, rowBg);
-
-        // Status icon
-        // const char* icon = e.inMST ? "[+]" : (e.skipped ? "[x]" : (i < stepIdx ? "   " : "   "));
-        const char* icon;
-        if (e.inMST) {
-            icon = "[+]";
-        } else if (e.skipped) {
-            icon = "[x]";
-        } else if (i < stepIdx) {
-            icon = "   ";
-        } else {
-            icon = "   ";
         }
-        Color ic;
-        if (e.inMST) {
-            ic = Pal::BtnSuccess;
-        } else if (e.skipped) {
-            ic = Pal::BtnDanger;
-        } else {
-            ic = Pal::TxtLight;
-        }
-        DrawTextEx(fontBold, icon, {882, ry + 10}, 13.0f, 1.0f, ic);
+    } else {
+        DrawSectionHeader("Adjacency List", "Write the neighbors for each node in one row.", 902, 292);
 
-        char ebuf[32];
-        snprintf(ebuf, sizeof(ebuf), "%s — %s    w = %d",
-                 nodes[e.u].label, nodes[e.v].label, e.w);
-        Color tc;
-        if (e.inMST) {
-            tc = Pal::BtnSuccess;
-        } else if (e.skipped) {
-            tc = Color{200, 80, 80, 255};
-        } else {
-            tc = Pal:: TxtDark;
+        for (int i = 0; i < GRAPH_N; i++) {
+            char label[4];
+            snprintf(label, sizeof(label), "%c", nodes[i].label[0]);
+            DrawTextEx(fontBold, label, {902, 345.0f + i * 36.0f}, 13.0f, 1.0f, Pal::TxtMid);
+            adjListFields[i].Draw();
         }
-        DrawTextEx(fontRegular, 
-                   ebuf, 
-                   {910, ry + 10}, 
-                   14.0f, 
-                   1.0f, 
-                   tc);
     }
 
-    // MST cost summary
-    if (mstCost > 0 || mstDone) {
-        char cstbuf[48]; 
-        snprintf(cstbuf, sizeof(cstbuf), "MST Cost: %d", mstCost);
-        DrawTextEx(fontBold, cstbuf, {885, 580}, 18.0f, 1.0f,
-                   mstDone ? Pal::BtnSuccess : Pal::TxtMid);
-    }
-
-    // Bottom panel
     DrawRectangleRec({0, 610, 1280, 110}, Pal::Panel);
     DrawLineEx({0, 610}, {1280, 610}, 1.0f, Pal::Border);
-    btnStep.Draw();
-    btnReset.Draw();
 
-    if (mstDone) {
-        DrawTextEx(fontBold, "MST Complete!", {330, 643}, 18.0f, 1.0f, Pal::BtnSuccess);
-    }
+    btnDelete.Draw();
+    btnEdit.Draw();
 
-    // Message
-    if (msgTimer > 0 && !message.empty()) {
-        float alphabet;
-        if (msgTimer < 0.5f) {
-            alphabet = msgTimer / 0.5f;
-        } else {
-            alphabet = 1.0f;
-        }
-        Color c = msgColor; 
-        c.a = (unsigned char)(alphabet * 220);
-        DrawTextEx(fontRegular, 
-                   message.c_str(), 
-                   {20, 680}, 
-                   14.5f, 
-                   1.0f, 
-                   c);
+    DrawTextEx(fontRegular, "Delete and Edit are UI placeholders for now.", {20, 645}, 13.0f, 1.0f, Pal::TxtLight);
+
+    if (msgTimer > 0.0f && !message.empty()) {
+        float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
+        Color c = msgColor;
+        c.a = (unsigned char)(alpha * 220.0f);
+        DrawTextEx(fontRegular, message.c_str(), {20, 680}, 14.5f, 1.0f, c);
     }
 }

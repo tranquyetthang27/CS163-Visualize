@@ -11,7 +11,7 @@ Card::Card(Rectangle r, Screen t,
 bool Card::Update() {
     bool hovered = CheckCollisionPointRec(GetMousePosition(), rect);
     hoverAnim += ((hovered ? 1.0f : 0.0f) - hoverAnim) * 10.0f * GetFrameTime();
-    if (hoverAnim > 0.01f)
+    if (hoverAnim < 0.00f)
         animTime += GetFrameTime();
     return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }

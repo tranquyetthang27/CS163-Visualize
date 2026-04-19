@@ -14,12 +14,13 @@ static constexpr int   MAX_NODES = 12;
 
 LinkedListScreen::LinkedListScreen()
     : input({430, 630, 180, 40}, "Enter value...", 6),
-      btnInsHead({20,  630, 120, 40}, "Insert Head", Pal::BtnPrimary, Pal::BtnPrimHov),
-      btnInsTail({150, 630, 120, 40}, "Insert Tail", Pal::BtnSuccess, Pal::BtnSuccHov),
+      btnInsert ({20,  630, 120, 40}, "Insert",      Pal::BtnPrimary, Pal::BtnPrimHov),
+      btnInsHead({20,  565,  57, 38}, "Head",        Pal::BtnPrimary, Pal::BtnPrimHov),
+      btnInsTail({82,  565,  57, 38}, "Tail",        Pal::BtnSuccess, Pal::BtnSuccHov),
       btnDel    ({620, 630, 100, 40}, "Delete",      Pal::BtnDanger,  Pal::BtnDangHov),
       btnSearch ({730, 630, 100, 40}, "Search",      Pal::BtnOrange,  Pal::BtnOrangeHov),
       btnBack   ({20,  20,  100, 36}, "< Back",      Pal::BtnNeutral, Pal::BtnNeutHov),
-      msgTimer(0.0f), msgColor(Pal::BtnSuccess) {}
+      insertMenuOpen(false), msgTimer(0.0f), msgColor(Pal::BtnSuccess) {}
 
 void LinkedListScreen::LayoutNodes() {
     int n = (int)nodes.size();
@@ -52,9 +53,20 @@ Screen LinkedListScreen::Update() {
     if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) return Screen::Home;
 
     input.Update();
-    bool insHead = btnInsHead.Update();
-    bool insTail = btnInsTail.Update();
-    bool doDel   = btnDel.Update();
+    bool openInsert = btnInsert.Update();
+    if (openInsert) insertMenuOpen = !insertMenuOpen;
+
+    bool insHead = false, insTail = false;
+    if (insertMenuOpen) {
+        insHead = btnInsHead.Update();
+        insTail = btnInsTail.Update();
+        if (insHead || insTail) insertMenuOpen = false;
+        // Đóng menu khi click ra ngoài
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !openInsert && !insHead && !insTail)
+            insertMenuOpen = false;
+    }
+
+    bool doDel    = btnDel.Update();
     bool doSearch = btnSearch.Update();
 
     auto parseVal = [&](int& out) -> bool {
@@ -188,8 +200,14 @@ void LinkedListScreen::Draw() const {
     DrawRectangleRec({0, 610, 1280, 110}, Pal::Panel);
     DrawLineEx({0, 610}, {1280, 610}, 1.0f, Pal::Border);
 
-    btnInsHead.Draw();
-    btnInsTail.Draw();
+    btnInsert.Draw();
+    if (insertMenuOpen) {
+        // Nền popup nhỏ
+        DrawRectangleRounded({15, 558, 129, 52}, 0.2f, 8, Pal::Surface);
+        DrawRectangleRoundedLines({15, 558, 129, 52}, 0.2f, 8, Pal::Border);
+        btnInsHead.Draw();
+        btnInsTail.Draw();
+    }
     input.Draw();
     btnDel.Draw();
     btnSearch.Draw();
