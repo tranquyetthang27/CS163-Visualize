@@ -1,7 +1,7 @@
 #pragma once
 #include "screen.h"
 #include "button.h"
-#include <vector>
+#include "input_field.h"
 #include <string>
 
 struct GNode {
@@ -16,6 +16,12 @@ struct GEdge {
     bool highlighted;
 };
 
+enum class GraphInputMode {
+    EdgeList,
+    AdjacencyMatrix,
+    AdjacencyList
+};
+
 class GraphScreen {
     static constexpr int GRAPH_N = 7;
     static constexpr int GRAPH_E = 11;
@@ -23,23 +29,24 @@ class GraphScreen {
     GNode nodes[GRAPH_N];
     GEdge edges[GRAPH_E];
 
-    // Kruskal union-find
-    int parent[GRAPH_N];
-    int ufRank[GRAPH_N];
-    int sortedEdges[GRAPH_E];   // indices into edges[], sorted by weight
-    int stepIdx;                // next edge to process
-    int mstCost;
-    bool mstDone;
+    GraphInputMode inputMode;
 
-    Button btnStep, btnReset, btnBack;
+    Button btnBack;
+    Button btnDelete;
+    Button btnEdit;
+
+    InputField edgeFromFields[GRAPH_E];
+    InputField edgeToFields[GRAPH_E];
+    InputField edgeWeightFields[GRAPH_E];
+    InputField matrixFields[GRAPH_N][GRAPH_N];
+    InputField adjListFields[GRAPH_N];
 
     std::string message;
     float msgTimer;
     Color msgColor;
 
-    void ResetKruskal();
-    int Find(int x);
-    bool Union(int x, int y);
+    void ClearInputFocus();
+    void SetInputMode(GraphInputMode mode);
     void SetMsg(const char* msg, 
                 Color c = {46, 160, 67, 255}, 
                 float dur = 3.0f);
