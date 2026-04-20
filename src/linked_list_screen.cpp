@@ -18,9 +18,12 @@ LinkedListScreen::LinkedListScreen()
       btnInsHead({20,  565,  57, 38}, "Head",        Pal::BtnPrimary, Pal::BtnPrimHov),
       btnInsTail({82,  565,  57, 38}, "Tail",        Pal::BtnSuccess, Pal::BtnSuccHov),
       btnDel    ({620, 630, 100, 40}, "Delete",      Pal::BtnDanger,  Pal::BtnDangHov),
+      btnDelHead({620, 565,  47, 38}, "Head",        Pal::BtnDanger,  Pal::BtnDangHov),
+      btnDelTail({672, 565,  47, 38}, "Tail",        Pal::BtnDanger,  Pal::BtnDangHov),
       btnSearch ({730, 630, 100, 40}, "Search",      Pal::BtnOrange,  Pal::BtnOrangeHov),
       btnBack   ({20,  20,  100, 36}, "< Back",      Pal::BtnNeutral, Pal::BtnNeutHov),
-      insertMenuOpen(false), msgTimer(0.0f), msgColor(Pal::BtnSuccess) {}
+      insertMenuOpen(false), deleteMenuOpen(false),
+      msgTimer(0.0f), msgColor(Pal::BtnSuccess) {}
 
 void LinkedListScreen::LayoutNodes() {
     int n = (int)nodes.size();
@@ -54,7 +57,7 @@ Screen LinkedListScreen::Update() {
 
     input.Update();
     bool openInsert = btnInsert.Update();
-    if (openInsert) insertMenuOpen = !insertMenuOpen;
+    if (openInsert) { insertMenuOpen = !insertMenuOpen; deleteMenuOpen = false; }
 
     bool insHead = false, insTail = false;
     if (insertMenuOpen) {
@@ -66,7 +69,19 @@ Screen LinkedListScreen::Update() {
             insertMenuOpen = false;
     }
 
-    bool doDel    = btnDel.Update();
+    bool openDel = btnDel.Update();
+    if (openDel) { deleteMenuOpen = !deleteMenuOpen; insertMenuOpen = false; }
+
+    bool delHead = false, delTail = false;
+    if (deleteMenuOpen) {
+        delHead = btnDelHead.Update();
+        delTail = btnDelTail.Update();
+        if (delHead || delTail) deleteMenuOpen = false;
+        // Đóng menu khi click ra ngoài
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !openDel && !delHead && !delTail)
+            deleteMenuOpen = false;
+    }
+
     bool doSearch = btnSearch.Update();
 
     auto parseVal = [&](int& out) -> bool {
@@ -106,20 +121,21 @@ Screen LinkedListScreen::Update() {
                 input.Clear();
             }
         }
-    } else if (doDel) {
-        int v; if (parseVal(v)) {
-            bool found = false;
-            for (auto it = nodes.begin(); it != nodes.end(); ++it) {
-                if (it->value == v) {
-                    nodes.erase(it);
-                    LayoutNodes();
-                    SetMsg("Deleted node.");
-                    input.Clear();
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) SetMsg("Value not found!", {229,57,53,255});
+    } else if (delHead) {
+        if (nodes.empty()) {
+            SetMsg("List is empty!", {229,57,53,255});
+        } else {
+            nodes.erase(nodes.begin());
+            LayoutNodes();
+            SetMsg("Deleted head node.", Pal::BtnDanger);
+        }
+    } else if (delTail) {
+        if (nodes.empty()) {
+            SetMsg("List is empty!", {229,57,53,255});
+        } else {
+            nodes.pop_back();
+            LayoutNodes();
+            SetMsg("Deleted tail node.", Pal::BtnDanger);
         }
     } else if (doSearch) {
         int v; if (parseVal(v)) {
@@ -210,6 +226,12 @@ void LinkedListScreen::Draw() const {
     }
     input.Draw();
     btnDel.Draw();
+    if (deleteMenuOpen) {
+        DrawRectangleRounded({615, 558, 110, 52}, 0.2f, 8, Pal::Surface);
+        DrawRectangleRoundedLines({615, 558, 110, 52}, 0.2f, 8, Pal::Border);
+        btnDelHead.Draw();
+        btnDelTail.Draw();
+    }
     btnSearch.Draw();
 
     // Message
