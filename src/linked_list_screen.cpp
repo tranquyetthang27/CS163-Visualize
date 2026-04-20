@@ -19,7 +19,7 @@ LinkedListScreen::LinkedListScreen()
       btnInsTail({82,  565,  57, 38}, "Tail",        Pal::BtnSuccess, Pal::BtnSuccHov),
       btnDel    ({620, 630, 100, 40}, "Delete",      Pal::BtnDanger,  Pal::BtnDangHov),
       btnDelHead({620, 565,  47, 38}, "Head",        Pal::BtnDanger,  Pal::BtnDangHov),
-      btnDelTail({672, 565,  47, 38}, "Tail",        Pal::BtnDanger,  Pal::BtnDangHov),
+      btnDelTail({672, 565,  47, 38}, "Tail",        Pal::BtnOrange,  Pal::BtnOrangeHov),
       btnSearch ({730, 630, 100, 40}, "Search",      Pal::BtnOrange,  Pal::BtnOrangeHov),
       btnBack   ({20,  20,  100, 36}, "< Back",      Pal::BtnNeutral, Pal::BtnNeutHov),
       insertMenuOpen(false), deleteMenuOpen(false),
