@@ -17,6 +17,7 @@ LinkedListScreen::LinkedListScreen()
       btnInsert ({20,  630, 120, 40}, "Insert",      Pal::BtnPrimary, Pal::BtnPrimHov),
       btnInsHead({20,  565,  57, 38}, "Head",        Pal::BtnPrimary, Pal::BtnPrimHov),
       btnInsTail({82,  565,  57, 38}, "Tail",        Pal::BtnSuccess, Pal::BtnSuccHov),
+      btnInsIdx ({144, 565,  57, 38}, "Index",       Pal::Teal,       Pal::TealDark),
       btnDel    ({620, 630, 100, 40}, "Delete",      Pal::BtnDanger,  Pal::BtnDangHov),
       btnDelHead({620, 565,  47, 38}, "Head",        Pal::BtnDanger,  Pal::BtnDangHov),
       btnDelTail({672, 565,  47, 38}, "Tail",        Pal::BtnOrange,  Pal::BtnOrangeHov),
@@ -60,13 +61,14 @@ Screen LinkedListScreen::Update() {
     bool openInsert = btnInsert.Update();
     if (openInsert) { insertMenuOpen = !insertMenuOpen; deleteMenuOpen = false; }
 
-    bool insHead = false, insTail = false;
+    bool insHead = false, insTail = false, insIdx = false;
     if (insertMenuOpen) {
         insHead = btnInsHead.Update();
         insTail = btnInsTail.Update();
-        if (insHead || insTail) insertMenuOpen = false;
+        insIdx  = btnInsIdx.Update();
+        if (insHead || insTail || insIdx) insertMenuOpen = false;
         // Đóng menu khi click ra ngoài
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !openInsert && !insHead && !insTail)
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !openInsert && !insHead && !insTail && !insIdx)
             insertMenuOpen = false;
     }
 
@@ -120,6 +122,32 @@ Screen LinkedListScreen::Update() {
                 nodes.push_back(nd);
                 LayoutNodes();
                 SetMsg("Inserted at tail.");
+                input.Clear();
+            }
+        }
+    } else if (insIdx) {
+        if (input.IsEmpty()) {
+            SetMsg("Format: 'index value'  e.g. '1 50'", {229,57,53,255});
+        } else {
+            int idx, v;
+            if (sscanf(input.text.c_str(), "%d %d", &idx, &v) != 2) {
+                SetMsg("Format: 'index value'  e.g. '1 50'", {229,57,53,255});
+            } else if ((int)nodes.size() >= MAX_NODES) {
+                SetMsg("List is full (max 12)!", {229,57,53,255});
+            } else if (idx < 0 || idx > (int)nodes.size()) {
+                char buf[64]; snprintf(buf, sizeof(buf), "Index out of range (0-%d)!", (int)nodes.size());
+                SetMsg(buf, {229,57,53,255});
+            } else {
+                LLNode nd;
+                nd.value = v;
+                // Animate in from above
+                nd.x = nd.tx = (nodes.empty() ? 640.0f : nodes[idx > 0 ? idx-1 : 0].x);
+                nd.y = NODE_Y - 80.0f; nd.ty = NODE_Y;
+                nd.alpha = 0; nd.state = LLState::Highlighted;
+                nodes.insert(nodes.begin() + idx, nd);
+                LayoutNodes();
+                char buf[64]; snprintf(buf, sizeof(buf), "Inserted %d at index %d.", v, idx);
+                SetMsg(buf, Pal::Teal);
                 input.Clear();
             }
         }
@@ -241,11 +269,12 @@ void LinkedListScreen::Draw() const {
 
     btnInsert.Draw();
     if (insertMenuOpen) {
-        // Nền popup nhỏ
-        DrawRectangleRounded({15, 558, 129, 52}, 0.2f, 8, Pal::Surface);
-        DrawRectangleRoundedLines({15, 558, 129, 52}, 0.2f, 8, Pal::Border);
+        // Nền popup nhỏ (mở rộng để chứa 3 button)
+        DrawRectangleRounded({15, 558, 191, 52}, 0.2f, 8, Pal::Surface);
+        DrawRectangleRoundedLines({15, 558, 191, 52}, 0.2f, 8, Pal::Border);
         btnInsHead.Draw();
         btnInsTail.Draw();
+        btnInsIdx.Draw();
     }
     input.Draw();
     btnDel.Draw();
