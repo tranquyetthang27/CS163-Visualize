@@ -15,7 +15,7 @@
 int main() {
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_HIGHDPI);
     InitWindow(1280, 720, "Data Structure Visualization");
-    SetTargetFPS(60);
+    SetTargetFPS(120);
     InitAudioDevice();
 
     LoadFonts();
@@ -35,7 +35,7 @@ int main() {
     while (!WindowShouldClose()) {
         AudioUpdate();
 
-        // ---- Update ----
+        // Update 
         Screen next = current;
         switch (current) {
             case Screen::MainMenu:   next = mainMenu.Update();        break;
@@ -48,10 +48,7 @@ int main() {
             case Screen::MST:        next = mstScreen.Update();       break;
         }
 
-        // Exit button on main menu returns MainMenu — catch ESC separately
         if (current == Screen::MainMenu) {
-            // Check Exit button clicked (btnExit in MainMenu returns MainMenu as sentinel)
-            // We detect exit via WindowShouldClose or ESC
         }
 
         // Re-construct screens on transition
@@ -69,7 +66,7 @@ int main() {
             current = next;
         }
 
-        // ---- Draw ----
+        // Draw
         BeginDrawing();
         switch (current) {
             case Screen::MainMenu:   mainMenu.Draw();        break;

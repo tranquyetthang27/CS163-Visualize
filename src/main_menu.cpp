@@ -10,7 +10,7 @@ static constexpr Color BG_NODE  = {63,  81, 181,  60};
 static constexpr Color BG_EDGE  = {63,  81, 181,  25};
 static constexpr Color ACCENT   = {100, 130, 255, 255};
 
-// Button layout: centered, 300×52, spaced 20px
+// Button layout
 static constexpr float BTN_W  = 300.0f;
 static constexpr float BTN_H  = 52.0f;
 static constexpr float BTN_SP = 18.0f;
@@ -47,7 +47,7 @@ Screen MainMenu::Update() {
     float dt = GetFrameTime();
     time += dt;
 
-    // Animate background nodes (wrap around edges)
+    // Animate background nodes 
     for (auto& n : const_cast<MainMenu*>(this)->bgNodes) {
         n.x += n.vx;
         n.y += n.vy;
@@ -74,7 +74,7 @@ Screen MainMenu::Update() {
     if (btnAbout.Update())    { AudioPlayClick(); return Screen::About;    }
     if (btnExit.Update())     { AudioPlayBack();  CloseWindow(); return Screen::MainMenu; }
 
-    // ESC or window close → exit handled in main
+    // ESC or window close
     return Screen::MainMenu;
 }
 
@@ -110,7 +110,7 @@ void MainMenu::Draw() const {
     float glow = 0.85f + 0.15f * sinf(time * 1.5f);
     DrawRectangle(0, 0, 1280, 720, {0, 0, 0, (unsigned char)(30 * glow)});
 
-    // ---- Title ----
+    // Title
     const char* title = "Data Structure Visualization";
     Vector2 tsz = MeasureTextEx(fontBold, title, 44.0f, 1.0f);
     float tx = 640.0f - tsz.x / 2.0f;
@@ -132,7 +132,7 @@ void MainMenu::Draw() const {
     DrawRectangle((int)(640 - lw/2), (int)(ty + tsz.y + 8), (int)lw, 2,
                   {100, 130, 255, 180});
 
-    // ---- Buttons ----
+    // Buttons 
     const_cast<Button&>(btnStart).Draw();
     const_cast<Button&>(btnSettings).Draw();
     const_cast<Button&>(btnAbout).Draw();
