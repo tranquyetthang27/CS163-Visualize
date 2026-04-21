@@ -21,7 +21,7 @@ class LinkedListScreen {
     InputField input;
     Button btnInsert, btnInsHead, btnInsTail;
     Button btnDel,    btnDelHead, btnDelTail;
-    Button btnSearch, btnBack;
+    Button btnSearch, btnUpdate, btnBack;
     bool   insertMenuOpen;
     bool   deleteMenuOpen;
 

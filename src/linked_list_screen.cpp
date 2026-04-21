@@ -21,6 +21,7 @@ LinkedListScreen::LinkedListScreen()
       btnDelHead({620, 565,  47, 38}, "Head",        Pal::BtnDanger,  Pal::BtnDangHov),
       btnDelTail({672, 565,  47, 38}, "Tail",        Pal::BtnOrange,  Pal::BtnOrangeHov),
       btnSearch ({730, 630, 100, 40}, "Search",      Pal::BtnOrange,  Pal::BtnOrangeHov),
+      btnUpdate ({845, 630, 100, 40}, "Update",      Pal::Teal,       Pal::TealDark),
       btnBack   ({20,  20,  100, 36}, "< Back",      Pal::BtnNeutral, Pal::BtnNeutHov),
       insertMenuOpen(false), deleteMenuOpen(false),
       msgTimer(0.0f), msgColor(Pal::BtnSuccess) {}
@@ -83,6 +84,7 @@ Screen LinkedListScreen::Update() {
     }
 
     bool doSearch = btnSearch.Update();
+    bool doUpdate = btnUpdate.Update();
 
     auto parseVal = [&](int& out) -> bool {
         if (input.IsEmpty()) { SetMsg("Enter a value!", {229,57,53,255}); return false; }
@@ -149,6 +151,27 @@ Screen LinkedListScreen::Update() {
             }
             SetMsg(found ? "Found!" : "Not found!", found ? Pal::BtnSuccess : Pal::BtnDanger);
         }
+    } else if (doUpdate) {
+        if (input.IsEmpty()) {
+            SetMsg("Format: 'index value'  e.g. '2 50'", {229,57,53,255});
+        } else {
+            int idx, newVal;
+            if (sscanf(input.text.c_str(), "%d %d", &idx, &newVal) != 2) {
+                SetMsg("Format: 'index value'  e.g. '2 50'", {229,57,53,255});
+            } else if (nodes.empty()) {
+                SetMsg("List is empty!", {229,57,53,255});
+            } else if (idx < 0 || idx >= (int)nodes.size()) {
+                char buf[64]; snprintf(buf, sizeof(buf), "Index out of range (0-%d)!", (int)nodes.size()-1);
+                SetMsg(buf, {229,57,53,255});
+            } else {
+                for (auto& nd : nodes) nd.state = LLState::Normal;
+                nodes[idx].value = newVal;
+                nodes[idx].state = LLState::Highlighted;
+                char buf[64]; snprintf(buf, sizeof(buf), "Updated index %d to %d.", idx, newVal);
+                SetMsg(buf, Pal::Teal);
+                input.Clear();
+            }
+        }
     }
 
     return Screen::LinkedList;
@@ -162,7 +185,7 @@ void LinkedListScreen::Draw() const {
     DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
     DrawTextEx(fontBold, "Linked List",
                {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
-    DrawTextEx(fontRegular, "Insert Head / Tail  |  Delete  |  Search",
+    DrawTextEx(fontRegular, "Insert  |  Delete  |  Search  |  Update: 'index value' (e.g. '2 50')",
                {130, 52}, 13.5f, 1.0f, Pal::TxtLight);
 
     btnBack.Draw();
@@ -233,13 +256,14 @@ void LinkedListScreen::Draw() const {
         btnDelTail.Draw();
     }
     btnSearch.Draw();
+    btnUpdate.Draw();
 
     // Message
     if (msgTimer > 0 && !message.empty()) {
         float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
         Color c = msgColor;
         c.a = (unsigned char)(alpha * 220);
-        DrawTextEx(fontRegular, message.c_str(), {845, 640}, 16.0f, 1.0f, c);
+        DrawTextEx(fontRegular, message.c_str(), {960, 640}, 16.0f, 1.0f, c);
     }
 
     // Node count
