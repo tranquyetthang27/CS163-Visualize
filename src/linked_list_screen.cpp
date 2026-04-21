@@ -21,6 +21,7 @@ LinkedListScreen::LinkedListScreen()
       btnDel    ({620, 630, 100, 40}, "Delete",      Pal::BtnDanger,  Pal::BtnDangHov),
       btnDelHead({620, 565,  47, 38}, "Head",        Pal::BtnDanger,  Pal::BtnDangHov),
       btnDelTail({672, 565,  47, 38}, "Tail",        Pal::BtnOrange,  Pal::BtnOrangeHov),
+      btnDelIdx ({724, 565,  57, 38}, "Index",       Pal::Teal,       Pal::TealDark),
       btnSearch ({730, 630, 100, 40}, "Search",      Pal::BtnOrange,  Pal::BtnOrangeHov),
       btnUpdate ({845, 630, 100, 40}, "Update",      Pal::Teal,       Pal::TealDark),
       btnBack   ({20,  20,  100, 36}, "< Back",      Pal::BtnNeutral, Pal::BtnNeutHov),
@@ -75,13 +76,14 @@ Screen LinkedListScreen::Update() {
     bool openDel = btnDel.Update();
     if (openDel) { deleteMenuOpen = !deleteMenuOpen; insertMenuOpen = false; }
 
-    bool delHead = false, delTail = false;
+    bool delHead = false, delTail = false, delIdx = false;
     if (deleteMenuOpen) {
         delHead = btnDelHead.Update();
         delTail = btnDelTail.Update();
-        if (delHead || delTail) deleteMenuOpen = false;
+        delIdx  = btnDelIdx.Update();
+        if (delHead || delTail || delIdx) deleteMenuOpen = false;
         // Đóng menu khi click ra ngoài
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !openDel && !delHead && !delTail)
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !openDel && !delHead && !delTail && !delIdx)
             deleteMenuOpen = false;
     }
 
@@ -166,6 +168,26 @@ Screen LinkedListScreen::Update() {
             nodes.pop_back();
             LayoutNodes();
             SetMsg("Deleted tail node.", Pal::BtnDanger);
+        }
+    } else if (delIdx) {
+        if (input.IsEmpty()) {
+            SetMsg("Enter index to delete!", {229,57,53,255});
+        } else {
+            int idx;
+            if (sscanf(input.text.c_str(), "%d", &idx) != 1) {
+                SetMsg("Invalid index!", {229,57,53,255});
+            } else if (nodes.empty()) {
+                SetMsg("List is empty!", {229,57,53,255});
+            } else if (idx < 0 || idx >= (int)nodes.size()) {
+                char buf[64]; snprintf(buf, sizeof(buf), "Index out of range (0-%d)!", (int)nodes.size()-1);
+                SetMsg(buf, {229,57,53,255});
+            } else {
+                char buf[64]; snprintf(buf, sizeof(buf), "Deleted node at index %d (value=%d).", idx, nodes[idx].value);
+                nodes.erase(nodes.begin() + idx);
+                LayoutNodes();
+                SetMsg(buf, Pal::BtnDanger);
+                input.Clear();
+            }
         }
     } else if (doSearch) {
         int v; if (parseVal(v)) {
@@ -279,10 +301,11 @@ void LinkedListScreen::Draw() const {
     input.Draw();
     btnDel.Draw();
     if (deleteMenuOpen) {
-        DrawRectangleRounded({615, 558, 110, 52}, 0.2f, 8, Pal::Surface);
-        DrawRectangleRoundedLines({615, 558, 110, 52}, 0.2f, 8, Pal::Border);
+        DrawRectangleRounded({615, 558, 171, 52}, 0.2f, 8, Pal::Surface);
+        DrawRectangleRoundedLines({615, 558, 171, 52}, 0.2f, 8, Pal::Border);
         btnDelHead.Draw();
         btnDelTail.Draw();
+        btnDelIdx.Draw();
     }
     btnSearch.Draw();
     btnUpdate.Draw();
