@@ -51,6 +51,9 @@ class GraphScreen {
     GraphEditTarget editTarget;
     bool editDialogOpen;
 
+    int draggingNodeIndex;
+    Vector2 draggingOffset;
+
     float inputScrollY;
     bool inputScrollDragging;
     float inputScrollDragOffset;

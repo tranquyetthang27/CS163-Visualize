@@ -153,6 +153,8 @@ GraphScreen::GraphScreen()
       selectedIndex(-1),
             editTarget(GraphEditTarget::None),
             editDialogOpen(false),
+                        draggingNodeIndex(-1),
+                        draggingOffset({0.0f, 0.0f}),
             inputScrollY(0.0f),
             inputScrollDragging(false),
             inputScrollDragOffset(0.0f),
@@ -228,6 +230,7 @@ void GraphScreen::ClearInputFocus() {
 void GraphScreen::ClearSelection() {
     selectionType = GraphSelectionType::None;
     selectedIndex = -1;
+    draggingNodeIndex = -1;
 }
 
 void GraphScreen::SetInputMode(GraphInputMode mode) {
@@ -585,7 +588,12 @@ Screen GraphScreen::Update() {
             ApplyInputToGraph(false);
         }
 
-        bool clickedGraph = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && mouse.x < 860.0f && mouse.y > 72.0f && mouse.y < 610.0f;
+        bool insideGraph = mouse.x < 860.0f && mouse.y > 72.0f && mouse.y < 610.0f;
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            draggingNodeIndex = -1;
+        }
+
+        bool clickedGraph = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && insideGraph;
         if (clickedGraph) {
             int hitNode = -1;
             for (int i = 0; i < GRAPH_N; i++) {
@@ -603,6 +611,8 @@ Screen GraphScreen::Update() {
             if (hitNode >= 0) {
                 selectionType = GraphSelectionType::Node;
                 selectedIndex = hitNode;
+                draggingNodeIndex = hitNode;
+                draggingOffset = {nodes[hitNode].x - mouse.x, nodes[hitNode].y - mouse.y};
             } else {
                 int hitEdge = -1;
                 for (int i = 0; i < static_cast<int>(edges.size()); i++) {
@@ -621,9 +631,31 @@ Screen GraphScreen::Update() {
                 if (hitEdge >= 0) {
                     selectionType = GraphSelectionType::Edge;
                     selectedIndex = hitEdge;
+                    draggingNodeIndex = -1;
                 } else {
                     ClearSelection();
+                    draggingNodeIndex = -1;
                 }
+            }
+        }
+
+        if (draggingNodeIndex >= 0 && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+            int i = draggingNodeIndex;
+            if (i >= 0 && i < GRAPH_N && nodes[i].visible) {
+                float minX = kNodeRadius + 8.0f;
+                float maxX = 860.0f - kNodeRadius - 8.0f;
+                float minY = 72.0f + kNodeRadius + 8.0f;
+                float maxY = 610.0f - kNodeRadius - 8.0f;
+
+                float nextX = mouse.x + draggingOffset.x;
+                float nextY = mouse.y + draggingOffset.y;
+                if (nextX < minX) nextX = minX;
+                if (nextX > maxX) nextX = maxX;
+                if (nextY < minY) nextY = minY;
+                if (nextY > maxY) nextY = maxY;
+
+                nodes[i].x = nextX;
+                nodes[i].y = nextY;
             }
         }
 
@@ -730,7 +762,7 @@ void GraphScreen::Draw() const {
     BeginScissorMode((int)kInputClip.x, (int)kInputClip.y, (int)kInputClip.width, (int)kInputClip.height);
     if (inputMode == GraphInputMode::EdgeList) {
         DrawFixedHeader("Edge List", "U, V, and weight for each edge.");
-        DrawTextEx(fontBold, "STT", {kEdgeListSttX, 340}, 12.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, "No.", {kEdgeListSttX, 340}, 12.0f, 1.0f, Pal::TxtLight);
         DrawTextEx(fontBold, "U", {kEdgeListUX, 340}, 12.0f, 1.0f, Pal::TxtLight);
         DrawTextEx(fontBold, "V", {kEdgeListVX, 340}, 12.0f, 1.0f, Pal::TxtLight);
         DrawTextEx(fontBold, "W", {kEdgeListWX, 340}, 12.0f, 1.0f, Pal::TxtLight);
