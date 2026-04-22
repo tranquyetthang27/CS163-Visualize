@@ -251,8 +251,8 @@ void LinkedListScreen::Draw() const {
         float ax = nodes[i].x + NODE_R;
         float ay = nodes[i].y;
         float bx = nodes[i + 1].x - NODE_R;
-        DrawLineEx({ax, ay}, {bx - 6, ay}, 2.0f, Pal::EdgeColor);
-        DrawTriangle({bx, ay}, {bx - 8, ay - 5}, {bx - 8, ay + 5}, Pal::EdgeColor);
+        DrawLineEx({ax, ay}, {bx - 6, ay}, 2.0f, BLACK);
+        DrawTriangle({bx, ay}, {bx - 8, ay - 5}, {bx - 8, ay + 5}, BLACK);
     }
 
     // Draw nodes as circles
