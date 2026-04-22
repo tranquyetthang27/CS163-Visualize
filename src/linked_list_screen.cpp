@@ -6,10 +6,9 @@
 #include <cmath>
 #include <stdexcept>
 
-static constexpr float NODE_W  = 64.0f;
-static constexpr float NODE_H  = 44.0f;
-static constexpr float NODE_GAP = 50.0f;
-static constexpr float NODE_Y   = 340.0f;
+static constexpr float NODE_R   = 30.0f;
+static constexpr float NODE_GAP = 44.0f;
+static constexpr float NODE_Y   = 360.0f;
 static constexpr int   MAX_NODES = 12;
 
 LinkedListScreen::LinkedListScreen()
@@ -30,10 +29,10 @@ LinkedListScreen::LinkedListScreen()
 
 void LinkedListScreen::LayoutNodes() {
     int n = (int)nodes.size();
-    float totalW = n * NODE_W + (n > 0 ? (n - 1) * NODE_GAP : 0);
-    float startX = 640.0f - totalW / 2.0f;
+    float totalW = n * 2 * NODE_R + (n > 0 ? (n - 1) * NODE_GAP : 0);
+    float startX = 640.0f - totalW / 2.0f + NODE_R;
     for (int i = 0; i < n; i++) {
-        nodes[i].tx = startX + i * (NODE_W + NODE_GAP);
+        nodes[i].tx = startX + i * (2 * NODE_R + NODE_GAP);
         nodes[i].ty = NODE_Y;
     }
 }
@@ -104,7 +103,7 @@ Screen LinkedListScreen::Update() {
             } else {
                 LLNode nd;
                 nd.value = v;
-                nd.x = nd.tx = -100; nd.y = nd.ty = NODE_Y;
+                nd.x = nd.tx = -100; nd.y = nd.ty = NODE_Y; // center coords
                 nd.alpha = 0; nd.state = LLState::Normal;
                 nodes.insert(nodes.begin(), nd);
                 LayoutNodes();
@@ -119,7 +118,7 @@ Screen LinkedListScreen::Update() {
             } else {
                 LLNode nd;
                 nd.value = v;
-                nd.x = nd.tx = 1400; nd.y = nd.ty = NODE_Y;
+                nd.x = nd.tx = 1400; nd.y = nd.ty = NODE_Y; // center coords
                 nd.alpha = 0; nd.state = LLState::Normal;
                 nodes.push_back(nd);
                 LayoutNodes();
@@ -144,7 +143,7 @@ Screen LinkedListScreen::Update() {
                 nd.value = v;
                 // Animate in from above
                 nd.x = nd.tx = (nodes.empty() ? 640.0f : nodes[idx > 0 ? idx-1 : 0].x);
-                nd.y = NODE_Y - 80.0f; nd.ty = NODE_Y;
+                nd.y = NODE_Y - 80.0f; nd.ty = NODE_Y; // center coords
                 nd.alpha = 0; nd.state = LLState::Highlighted;
                 nodes.insert(nodes.begin() + idx, nd);
                 LayoutNodes();
@@ -249,14 +248,14 @@ void LinkedListScreen::Draw() const {
     // Draw arrows between nodes first (behind nodes)
     int n = (int)nodes.size();
     for (int i = 0; i < n - 1; i++) {
-        float ax = nodes[i].x + NODE_W;
-        float ay = nodes[i].y + NODE_H / 2.0f;
-        float bx = nodes[i + 1].x;
+        float ax = nodes[i].x + NODE_R;
+        float ay = nodes[i].y;
+        float bx = nodes[i + 1].x - NODE_R;
         DrawLineEx({ax, ay}, {bx - 6, ay}, 2.0f, Pal::EdgeColor);
         DrawTriangle({bx, ay}, {bx - 8, ay - 5}, {bx - 8, ay + 5}, Pal::EdgeColor);
     }
 
-    // Draw nodes
+    // Draw nodes as circles
     for (const auto& nd : nodes) {
         Color fillC  = Pal::NodeFill;
         Color bordC  = Pal::NodeBorder;
@@ -274,13 +273,12 @@ void LinkedListScreen::Draw() const {
         unsigned char a = (unsigned char)(nd.alpha * 255);
         fillC.a = a; bordC.a = a; textC.a = a;
 
-        Rectangle r = {nd.x, nd.y, NODE_W, NODE_H};
-        // Border
-        Rectangle bo = {r.x - 2, r.y - 2, r.width + 4, r.height + 4};
-        DrawRectangleRounded(bo, 0.25f, 8, bordC);
-        DrawRectangleRounded(r,  0.25f, 8, fillC);
+        Vector2 center = {nd.x, nd.y};
+        DrawCircleV(center, NODE_R + 2, bordC);
+        DrawCircleV(center, NODE_R,     fillC);
 
-        // Value text
+        // Value text centered in circle
+        Rectangle r = {nd.x - NODE_R, nd.y - NODE_R, 2 * NODE_R, 2 * NODE_R};
         char buf[16]; snprintf(buf, sizeof(buf), "%d", nd.value);
         DrawTextInRect(fontBold, buf, r, 18.0f, textC);
     }
