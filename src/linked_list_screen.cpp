@@ -38,63 +38,110 @@ void LinkedListScreen::LayoutNodes() {
 }
 
 void LinkedListScreen::SetMsg(const char* msg, Color c, float dur) {
-    message  = msg;
-    msgColor = c;
-    msgTimer = dur;
+    message = msg; msgColor = c; msgTimer = dur;
 }
 
-// ── Insert step-by-step ──────────────────────────────────────────
+//nsert step
 
 void LinkedListScreen::StartInsertStep(int idx, int v) {
-    // Insert node immediately; steps control highlight & arrow visibility
     LLNode nd;
-    nd.value = v;
-    nd.alpha = 0.0f;
-    nd.state = LLState::Normal;
-    // spawn from above
-    nd.x  = (nodes.empty() ? 640.0f : (idx == 0 ? nodes[0].tx : nodes[idx > 0 ? idx-1 : 0].tx));
+    nd.value = v; nd.alpha = 0.0f; nd.state = LLState::Normal;
+    nd.x  = nodes.empty() ? 640.0f : (idx == 0 ? nodes[0].tx : nodes[idx > 0 ? idx-1 : 0].tx);
     nd.tx = nd.x;
-    nd.y  = NODE_Y - 80.0f;
-    nd.ty = NODE_Y;
+    nd.y  = NODE_Y - 80.0f; nd.ty = NODE_Y;
     nodes.insert(nodes.begin() + idx, nd);
     LayoutNodes();
-
     for (auto& n : nodes) n.state = LLState::Normal;
-    stepActive  = true;
-    stepPhase   = 0;
-    stepTimer   = 0.35f;
-    stepNewIdx  = idx;
+
+    stepOp    = StepOp::Insert;
+    stepActive = true;
+    stepPhase  = 0;
+    stepTimer  = 0.5f;
+    stepIdx    = idx;
     input.Clear();
 }
 
-void LinkedListScreen::AdvanceStep() {
-    stepPhase++;
+//Delete step
 
-    // Skip phase 1 for head insert (no predecessor)
-    if (stepPhase == 1 && stepNewIdx == 0)
-        stepPhase = 2;
-
+void LinkedListScreen::StartDeleteStep(int idx) {
     for (auto& n : nodes) n.state = LLState::Normal;
 
-    switch (stepPhase) {
-        case 1:
-            nodes[stepNewIdx - 1].state = LLState::Highlighted;
-            stepTimer = 0.3f;
-            break;
-        case 2:
-            stepTimer = 0.3f;
-            break;
-        case 3:
-            nodes[stepNewIdx].state = LLState::Highlighted;
-            stepTimer = 0.3f;
-            break;
-        default:
-            nodes[stepNewIdx].state = LLState::Normal;
-            stepActive = false;
-            char buf[64];
-            snprintf(buf, sizeof(buf), "Inserted %d at index %d.", nodes[stepNewIdx].value, stepNewIdx);
-            SetMsg(buf, Pal::BtnSuccess, 3.0f);
-            break;
+    stepOp     = StepOp::Delete;
+    stepActive = true;
+    stepPhase  = 0;
+    stepIdx    = idx;
+
+    // Phase 0: if idx==0 mark immediately as Removing, else start traversal
+    if (idx == 0) {
+        nodes[0].state = LLState::Removing;
+        stepTimer = 0.5f;
+    } else {
+        nodes[0].state = LLState::Highlighted;
+        stepTimer = 0.5f;
+    }
+    input.Clear();
+}
+
+
+void LinkedListScreen::AdvanceStep() {
+    //Insert
+    if (stepOp == StepOp::Insert) {
+        stepPhase++;
+        if (stepPhase == 1 && stepIdx == 0) stepPhase = 2; // no predecessor for head
+
+        for (auto& n : nodes) n.state = LLState::Normal;
+        switch (stepPhase) {
+            case 1:
+                nodes[stepIdx - 1].state = LLState::Highlighted;
+                stepTimer = 0.5f; break;
+            case 2:
+                stepTimer = 0.5f; break; // arrows appear
+            case 3:
+                nodes[stepIdx].state = LLState::Highlighted;
+                stepTimer = 0.5f; break;
+            default:
+                nodes[stepIdx].state = LLState::Normal;
+                stepActive = false; stepOp = StepOp::None;
+                char buf[64];
+                snprintf(buf, sizeof(buf), "Inserted %d at index %d.", nodes[stepIdx].value, stepIdx);
+                SetMsg(buf, Pal::BtnSuccess, 3.0f);
+                break;
+        }
+        return;
+    }
+
+    //DeLete
+    if (stepOp == StepOp::Delete) {
+        stepPhase++;
+        for (auto& n : nodes) n.state = LLState::Normal;
+
+        if (stepPhase < stepIdx) {
+            // Still traversing: move pointer to next node
+            nodes[stepPhase].state = LLState::Highlighted;
+            stepTimer = 0.5f;
+
+        } else if (stepPhase == stepIdx) {
+            // Reached target: mark for deletion
+            nodes[stepIdx].state = LLState::Removing;
+            stepTimer = 0.5f;
+
+        } else if (stepPhase == stepIdx + 1) {
+            // Remove node, then color predecessor (orange) and successor (green)
+            int pred = stepIdx - 1;
+            nodes.erase(nodes.begin() + stepIdx);
+            LayoutNodes();
+            if (pred >= 0)
+                nodes[pred].state = LLState::Predecessor;
+            if (stepIdx < (int)nodes.size())
+                nodes[stepIdx].state = LLState::Highlighted;
+            stepTimer = 0.5f;
+
+        } else {
+            // Done
+            for (auto& n : nodes) n.state = LLState::Normal;
+            stepActive = false; stepOp = StepOp::None;
+            SetMsg("Deleted successfully.", Pal::BtnDanger, 3.0f);
+        }
     }
 }
 
@@ -113,15 +160,12 @@ Screen LinkedListScreen::Update() {
     if (btnBack.Update() || (IsKeyPressed(KEY_ESCAPE) && !stepActive))
         return Screen::Home;
 
-    // ── Step mode (auto-play) ─────────────────────────────────────
     if (stepActive) {
         stepTimer -= dt;
-        if (stepTimer <= 0.0f)
-            AdvanceStep();
+        if (stepTimer <= 0.0f) AdvanceStep();
         return Screen::LinkedList;
     }
 
-    // ── Normal mode ──────────────────────────────────────────────
     input.Update();
     bool openInsert = btnInsert.Update();
     if (openInsert) { insertMenuOpen = !insertMenuOpen; deleteMenuOpen = false; }
@@ -159,6 +203,7 @@ Screen LinkedListScreen::Update() {
         return true;
     };
 
+    // Insert
     if (insHead) {
         int v; if (parseVal(v)) {
             if ((int)nodes.size() >= MAX_NODES) SetMsg("List is full (max 12)!", {229,57,53,255});
@@ -170,47 +215,42 @@ Screen LinkedListScreen::Update() {
             else StartInsertStep((int)nodes.size(), v);
         }
     } else if (insIdx) {
-        if (input.IsEmpty()) {
-            SetMsg("Format: 'index value'  e.g. '1 50'", {229,57,53,255});
-        } else {
+        if (input.IsEmpty()) { SetMsg("Format: 'index value'  e.g. '1 50'", {229,57,53,255}); }
+        else {
             int idx, v;
-            if (sscanf(input.text.c_str(), "%d %d", &idx, &v) != 2) {
+            if (sscanf(input.text.c_str(), "%d %d", &idx, &v) != 2)
                 SetMsg("Format: 'index value'  e.g. '1 50'", {229,57,53,255});
-            } else if ((int)nodes.size() >= MAX_NODES) {
+            else if ((int)nodes.size() >= MAX_NODES)
                 SetMsg("List is full (max 12)!", {229,57,53,255});
-            } else if (idx < 0 || idx > (int)nodes.size()) {
+            else if (idx < 0 || idx > (int)nodes.size()) {
                 char buf[64]; snprintf(buf, sizeof(buf), "Index out of range (0-%d)!", (int)nodes.size());
                 SetMsg(buf, {229,57,53,255});
-            } else {
-                StartInsertStep(idx, v);
-            }
+            } else StartInsertStep(idx, v);
         }
-    } else if (delHead) {
+    }
+    // Delete
+    else if (delHead) {
         if (nodes.empty()) SetMsg("List is empty!", {229,57,53,255});
-        else { nodes.erase(nodes.begin()); LayoutNodes(); SetMsg("Deleted head node.", Pal::BtnDanger); }
+        else StartDeleteStep(0);
     } else if (delTail) {
         if (nodes.empty()) SetMsg("List is empty!", {229,57,53,255});
-        else { nodes.pop_back(); LayoutNodes(); SetMsg("Deleted tail node.", Pal::BtnDanger); }
+        else StartDeleteStep((int)nodes.size() - 1);
     } else if (delIdx) {
         if (input.IsEmpty()) { SetMsg("Enter index to delete!", {229,57,53,255}); }
         else {
             int idx;
-            if (sscanf(input.text.c_str(), "%d", &idx) != 1) {
+            if (sscanf(input.text.c_str(), "%d", &idx) != 1)
                 SetMsg("Invalid index!", {229,57,53,255});
-            } else if (nodes.empty()) {
+            else if (nodes.empty())
                 SetMsg("List is empty!", {229,57,53,255});
-            } else if (idx < 0 || idx >= (int)nodes.size()) {
+            else if (idx < 0 || idx >= (int)nodes.size()) {
                 char buf[64]; snprintf(buf, sizeof(buf), "Index out of range (0-%d)!", (int)nodes.size()-1);
                 SetMsg(buf, {229,57,53,255});
-            } else {
-                char buf[64]; snprintf(buf, sizeof(buf), "Deleted node at index %d (value=%d).", idx, nodes[idx].value);
-                nodes.erase(nodes.begin() + idx);
-                LayoutNodes();
-                SetMsg(buf, Pal::BtnDanger);
-                input.Clear();
-            }
+            } else StartDeleteStep(idx);
         }
-    } else if (doSearch) {
+    }
+    // Search
+    else if (doSearch) {
         int v; if (parseVal(v)) {
             bool found = false;
             for (auto& nd : nodes) nd.state = LLState::Normal;
@@ -219,15 +259,17 @@ Screen LinkedListScreen::Update() {
             }
             SetMsg(found ? "Found!" : "Not found!", found ? Pal::BtnSuccess : Pal::BtnDanger);
         }
-    } else if (doUpdate) {
+    }
+    // Update
+    else if (doUpdate) {
         if (input.IsEmpty()) { SetMsg("Format: 'index value'  e.g. '2 50'", {229,57,53,255}); }
         else {
             int idx, newVal;
-            if (sscanf(input.text.c_str(), "%d %d", &idx, &newVal) != 2) {
+            if (sscanf(input.text.c_str(), "%d %d", &idx, &newVal) != 2)
                 SetMsg("Format: 'index value'  e.g. '2 50'", {229,57,53,255});
-            } else if (nodes.empty()) {
+            else if (nodes.empty())
                 SetMsg("List is empty!", {229,57,53,255});
-            } else if (idx < 0 || idx >= (int)nodes.size()) {
+            else if (idx < 0 || idx >= (int)nodes.size()) {
                 char buf[64]; snprintf(buf, sizeof(buf), "Index out of range (0-%d)!", (int)nodes.size()-1);
                 SetMsg(buf, {229,57,53,255});
             } else {
@@ -244,7 +286,7 @@ Screen LinkedListScreen::Update() {
     return Screen::LinkedList;
 }
 
-// ── Draw ─────────────────────────────────────────────────────────
+//Draw
 
 void LinkedListScreen::Draw() const {
     ClearBackground(Pal::BG);
@@ -253,9 +295,8 @@ void LinkedListScreen::Draw() const {
     DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
     DrawTextEx(fontBold, "Linked List", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
     DrawTextEx(fontRegular,
-               stepActive ? "Step-by-step insert  |  Press  Next >  to advance  |  Stop to cancel"
-                          : "Insert  |  Delete  |  Search  |  Update: 'index value' (e.g. '2 50')",
-               {130, 52}, 13.5f, 1.0f, stepActive ? Pal::BtnOrange : Pal::TxtLight);
+               "Insert  |  Delete  |  Search  |  Update: 'index value' (e.g. '2 50')",
+               {130, 52}, 13.5f, 1.0f, Pal::TxtLight);
     btnBack.Draw();
 
     if (nodes.empty()) {
@@ -265,13 +306,12 @@ void LinkedListScreen::Draw() const {
 
     int n = (int)nodes.size();
 
-    // Arrows — hide arrows to/from new node until phase 2
+    // Arrows — hide arrows to/from new node until insert phase 2
     for (int i = 0; i < n - 1; i++) {
-        if (stepActive && stepPhase < 2) {
-            if (i == stepNewIdx || i + 1 == stepNewIdx) continue;
+        if (stepActive && stepOp == StepOp::Insert && stepPhase < 2) {
+            if (i == stepIdx || i + 1 == stepIdx) continue;
         }
-        float ax = nodes[i].x + NODE_R;
-        float ay = nodes[i].y;
+        float ax = nodes[i].x + NODE_R, ay = nodes[i].y;
         float bx = nodes[i+1].x - NODE_R;
         DrawLineEx({ax, ay}, {bx - 6, ay}, 2.0f, BLACK);
         DrawTriangle({bx, ay}, {bx-8, ay-5}, {bx-8, ay+5}, BLACK);
@@ -280,12 +320,16 @@ void LinkedListScreen::Draw() const {
     // Nodes
     for (const auto& nd : nodes) {
         Color fillC = Pal::NodeFill, bordC = Pal::NodeBorder, textC = Pal::TxtDark;
-        if (nd.state == LLState::Found) {
-            fillC = Pal::NodeFound; bordC = {36,128,54,255}; textC = WHITE;
-        } else if (nd.state == LLState::Highlighted) {
-            fillC = {76, 175, 80, 255}; bordC = {36, 128, 54, 255}; textC = WHITE;
-        } else if (nd.state == LLState::Removing) {
-            fillC = {255,200,200,255}; bordC = Pal::BtnDanger;
+        switch (nd.state) {
+            case LLState::Highlighted:
+                fillC = {76, 175, 80, 255}; bordC = {36, 128, 54, 255}; textC = WHITE; break;
+            case LLState::Found:
+                fillC = Pal::NodeFound; bordC = {36,128,54,255}; textC = WHITE; break;
+            case LLState::Removing:
+                fillC = {239, 83, 80, 255}; bordC = {198, 40, 40, 255}; textC = WHITE; break;
+            case LLState::Predecessor:
+                fillC = {255, 204, 128, 255}; bordC = {245, 124, 0, 255}; textC = Pal::TxtDark; break;
+            default: break;
         }
         unsigned char a = (unsigned char)(nd.alpha * 255);
         fillC.a = a; bordC.a = a; textC.a = a;
@@ -301,34 +345,28 @@ void LinkedListScreen::Draw() const {
     DrawRectangleRec({0, 610, 1280, 110}, Pal::Panel);
     DrawLineEx({0, 610}, {1280, 610}, 1.0f, Pal::Border);
 
-    if (!stepActive) {
-        btnInsert.Draw();
-        if (insertMenuOpen) {
-            DrawRectangleRounded({15, 558, 191, 52}, 0.2f, 8, Pal::Surface);
-            DrawRectangleRoundedLines({15, 558, 191, 52}, 0.2f, 8, Pal::Border);
-            btnInsHead.Draw();
-            btnInsTail.Draw();
-            btnInsIdx.Draw();
-        }
-        input.Draw();
-        btnDel.Draw();
-        if (deleteMenuOpen) {
-            DrawRectangleRounded({615, 558, 171, 52}, 0.2f, 8, Pal::Surface);
-            DrawRectangleRoundedLines({615, 558, 171, 52}, 0.2f, 8, Pal::Border);
-            btnDelHead.Draw();
-            btnDelTail.Draw();
-            btnDelIdx.Draw();
-        }
-        btnSearch.Draw();
-        btnUpdate.Draw();
-
-        if (msgTimer > 0 && !message.empty()) {
-            float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
-            Color c = msgColor; c.a = (unsigned char)(alpha * 220);
-            DrawTextEx(fontRegular, message.c_str(), {960, 640}, 16.0f, 1.0f, c);
-        }
-
-        char cnt[32]; snprintf(cnt, sizeof(cnt), "Nodes: %d / %d", (int)nodes.size(), MAX_NODES);
-        DrawTextEx(fontRegular, cnt, {1150, 640}, 14.0f, 1.0f, Pal::TxtLight);
+    btnInsert.Draw();
+    if (insertMenuOpen) {
+        DrawRectangleRounded({15, 558, 191, 52}, 0.2f, 8, Pal::Surface);
+        DrawRectangleRoundedLines({15, 558, 191, 52}, 0.2f, 8, Pal::Border);
+        btnInsHead.Draw(); btnInsTail.Draw(); btnInsIdx.Draw();
     }
+    input.Draw();
+    btnDel.Draw();
+    if (deleteMenuOpen) {
+        DrawRectangleRounded({615, 558, 171, 52}, 0.2f, 8, Pal::Surface);
+        DrawRectangleRoundedLines({615, 558, 171, 52}, 0.2f, 8, Pal::Border);
+        btnDelHead.Draw(); btnDelTail.Draw(); btnDelIdx.Draw();
+    }
+    btnSearch.Draw();
+    btnUpdate.Draw();
+
+    if (msgTimer > 0 && !message.empty()) {
+        float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
+        Color c = msgColor; c.a = (unsigned char)(alpha * 220);
+        DrawTextEx(fontRegular, message.c_str(), {960, 640}, 16.0f, 1.0f, c);
+    }
+
+    char cnt[32]; snprintf(cnt, sizeof(cnt), "Nodes: %d / %d", (int)nodes.size(), MAX_NODES);
+    DrawTextEx(fontRegular, cnt, {1150, 640}, 14.0f, 1.0f, Pal::TxtLight);
 }

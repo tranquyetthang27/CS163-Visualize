@@ -5,15 +5,17 @@
 #include <vector>
 #include <string>
 
-enum class LLState { Normal, Highlighted, Found, Removing };
+enum class LLState { Normal, Highlighted, Found, Removing, Predecessor };
 
 struct LLNode {
     int   value;
-    float tx, ty;   // target position
-    float x,  y;   // animated position
-    float alpha;    // 0..1 for fade in/out
+    float tx, ty;
+    float x,  y;
+    float alpha;
     LLState state;
 };
+
+enum class StepOp { None, Insert, Delete };
 
 class LinkedListScreen {
     std::vector<LLNode> nodes;
@@ -29,15 +31,17 @@ class LinkedListScreen {
     float       msgTimer;
     Color       msgColor;
 
-    // Insert step-by-step (auto-play)
-    bool  stepActive  = false;
-    int   stepPhase   = 0;
-    float stepTimer   = 0.0f;
-    int   stepNewIdx  = -1;
+    // Step-by-step (insert & delete)
+    StepOp stepOp     = StepOp::None;
+    bool   stepActive = false;
+    int    stepPhase  = 0;
+    float  stepTimer  = 0.0f;
+    int    stepIdx    = -1;   // inserted index OR delete target index
 
     void LayoutNodes();
     void SetMsg(const char* msg, Color c = {46,160,67,255}, float dur = 2.5f);
     void StartInsertStep(int idx, int v);
+    void StartDeleteStep(int idx);
     void AdvanceStep();
 
 public:
