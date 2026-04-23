@@ -25,8 +25,7 @@ class TrieScreen {
     Camera2D camera;
 
     InputField input;
-    Button btnInsert, btnSearch, btnClear, btnBack;
-
+    Button btnInsert, btnSearch, btnClear, btnBack, btnLoad;
     std::string message;
     float msgTimer;
     Color msgColor;
@@ -54,7 +53,9 @@ private:
     void DrawAllEdges(int node);
     void DrawAllNodes(int node);
     
-    
+    void InstantInsert(const std::string& word);
+    void OnLoadFileTriggered(const std::string& path);
+
     void StartInsert(const std::string& word);
     void StartSearch(const std::string& word);
 };

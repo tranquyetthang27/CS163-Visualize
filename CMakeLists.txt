@@ -10,6 +10,8 @@ add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
 add_subdirectory("raylib")
 
+add_definitions(-DPROJECT_ROOT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/")
+
 target_link_libraries(${PROJECT_NAME} PUBLIC raylib)
 target_include_directories(${PROJECT_NAME} PRIVATE include)
 
