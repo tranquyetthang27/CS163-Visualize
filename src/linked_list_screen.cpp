@@ -25,7 +25,8 @@ LinkedListScreen::LinkedListScreen()
       btnUpdate ({845, 630, 100, 40}, "Update",      Pal::Teal,       Pal::TealDark),
       btnBack   ({20,  20,  100, 36}, "< Back",      Pal::BtnNeutral, Pal::BtnNeutHov),
       insertMenuOpen(false), deleteMenuOpen(false),
-      msgTimer(0.0f), msgColor(Pal::BtnSuccess) {}
+      msgTimer(0.0f), msgColor(Pal::BtnSuccess),
+      btnShowCode({1140, 18, 120, 34}, "Show Code", Pal::BtnNeutral, Pal::BtnNeutHov) {}
 
 void LinkedListScreen::LayoutNodes() {
     int n = (int)nodes.size();
@@ -159,6 +160,10 @@ Screen LinkedListScreen::Update() {
 
     if (btnBack.Update() || (IsKeyPressed(KEY_ESCAPE) && !stepActive))
         return Screen::Home;
+    if (btnShowCode.Update()) {
+        showCode = !showCode;
+        btnShowCode.label = showCode ? "Hide Code" : "Show Code";
+    }
 
     if (stepActive) {
         stepTimer -= dt;
@@ -298,6 +303,7 @@ void LinkedListScreen::Draw() const {
                "Insert  |  Delete  |  Search  |  Update: 'index value' (e.g. '2 50')",
                {130, 52}, 13.5f, 1.0f, Pal::TxtLight);
     btnBack.Draw();
+    btnShowCode.Draw();
 
     if (nodes.empty()) {
         DrawTextCentered(fontRegular, "List is empty — insert a value below",
@@ -341,8 +347,8 @@ void LinkedListScreen::Draw() const {
         DrawTextInRect(fontBold, buf, r, 18.0f, textC);
     }
 
-    // Code panel (shown during insert step)
-    if (stepActive && stepOp == StepOp::Insert) {
+    // Code panel
+    if (showCode) {
         const char* codeLines[] = {
             "node* newNode = new node(val);",
             "node* cur = head;",
@@ -368,7 +374,6 @@ void LinkedListScreen::Draw() const {
 
         DrawRectangleRounded({PX, PY, PW, PH}, 0.1f, 8, {28, 35, 51, 235});
         DrawRectangleRoundedLines({PX, PY, PW, PH}, 0.1f, 8, {63, 81, 181, 200});
-        DrawTextEx(fontBold, "Insert — C++", {PX + 10, PY + 4}, 12.0f, 1.0f, {148, 163, 183, 255});
 
         for (int i = 0; i < NUM_LINES; i++) {
             float ly = PY + 18 + i * LH;

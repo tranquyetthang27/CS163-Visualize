@@ -31,6 +31,9 @@ class LinkedListScreen {
     float       msgTimer;
     Color       msgColor;
 
+    bool   showCode   = false;
+    Button btnShowCode;
+
     // Step-by-step (insert & delete)
     StepOp stepOp     = StepOp::None;
     bool   stepActive = false;
