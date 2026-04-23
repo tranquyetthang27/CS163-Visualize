@@ -63,6 +63,8 @@ class GraphScreen {
     Button btnEdit;
     Button btnEditOk;
     Button btnEditCancel;
+    Button btnKruskal;
+    Button btnPrim;
 
     InputField edgeFromFields[GRAPH_E];
     InputField edgeToFields[GRAPH_E];
@@ -90,6 +92,8 @@ class GraphScreen {
     void SetMsg(const char* msg, 
                 Color c = {46, 160, 67, 255}, 
                 float dur = 3.0f);
+    void RunKruskal();
+    void RunPrim();
 
 public:
     GraphScreen();

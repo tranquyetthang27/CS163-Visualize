@@ -3,9 +3,12 @@
 #include "colors.h"
 #include "font.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
+#include <numeric>
 #include <sstream>
 
 namespace {
@@ -851,3 +854,98 @@ void GraphScreen::Draw() const {
         btnEditCancel.Draw();
     }
 }
+
+void GraphScreen::RunKruskal() {
+   for (auto& e : edges) {
+       e.inMST = false;
+       e.skipped = false;
+   }
+
+
+   // collect visible edge indices sorted by weight
+   std::vector<int> order;
+   for (int i = 0; i < (int)edges.size(); i++) {
+       if (edges[i].visible) order.push_back(i);
+   }
+   std::sort(order.begin(), order.end(), [&](int a, int b) {
+       return edges[a].w < edges[b].w;
+   });
+
+
+   // union-find over visible nodes
+   std::vector<int> parent(GRAPH_N);
+   std::iota(parent.begin(), parent.end(), 0);
+   std::function<int(int)> find = [&](int x) -> int {
+       return parent[x] == x ? x : parent[x] = find(parent[x]);
+   };
+
+
+   int added = 0;
+   for (int idx : order) {
+       GEdge& e = edges[idx];
+       if (!nodes[e.u].visible || !nodes[e.v].visible) continue;
+       int pu = find(e.u), pv = find(e.v);
+       if (pu == pv) {
+           e.skipped = true;
+       } else {
+           parent[pu] = pv;
+           e.inMST = true;
+           added++;
+       }
+   }
+
+
+   char buf[64];
+   std::snprintf(buf, sizeof(buf), "Kruskal: MST found with %d edges.", added);
+   SetMsg(buf, {46, 160, 67, 255}, 5.0f);
+}
+
+
+void GraphScreen::RunPrim() {
+   for (auto& e : edges) {
+       e.inMST = false;
+       e.skipped = false;
+   }
+
+
+   // find first visible node
+   int start = -1;
+   for (int i = 0; i < GRAPH_N; i++) {
+       if (nodes[i].visible) { start = i; break; }
+   }
+   if (start == -1) {
+       SetMsg("No visible nodes.", {200, 60, 60, 255}, 3.0f);
+       return;
+   }
+
+
+   std::vector<bool> inTree(GRAPH_N, false);
+   inTree[start] = true;
+   int added = 0;
+   int visibleCount = 0;
+   for (int i = 0; i < GRAPH_N; i++) if (nodes[i].visible) visibleCount++;
+
+
+   while (added < visibleCount - 1) {
+       int bestIdx = -1;
+       int bestW = INT_MAX;
+       for (int i = 0; i < (int)edges.size(); i++) {
+           const GEdge& e = edges[i];
+           if (!e.visible || !nodes[e.u].visible || !nodes[e.v].visible) continue;
+           bool uIn = inTree[e.u], vIn = inTree[e.v];
+           if (uIn == vIn) continue; // both in or both out
+           if (e.w < bestW) { bestW = e.w; bestIdx = i; }
+       }
+       if (bestIdx == -1) break; // disconnected
+       edges[bestIdx].inMST = true;
+       inTree[edges[bestIdx].u] = true;
+       inTree[edges[bestIdx].v] = true;
+       added++;
+   }
+
+
+   char buf[64];
+   std::snprintf(buf, sizeof(buf), "Prim: MST found with %d edges.", added);
+   SetMsg(buf, {46, 160, 67, 255}, 5.0f);
+}
+
