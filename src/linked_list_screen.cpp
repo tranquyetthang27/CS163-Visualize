@@ -62,7 +62,7 @@ void LinkedListScreen::StartInsertStep(int idx, int v) {
     for (auto& n : nodes) n.state = LLState::Normal;
     stepActive  = true;
     stepPhase   = 0;
-    stepTimer   = 0.7f;
+    stepTimer   = 0.35f;
     stepNewIdx  = idx;
     input.Clear();
 }
@@ -79,15 +79,14 @@ void LinkedListScreen::AdvanceStep() {
     switch (stepPhase) {
         case 1:
             nodes[stepNewIdx - 1].state = LLState::Highlighted;
-            stepTimer = 0.6f;
+            stepTimer = 0.3f;
             break;
         case 2:
-            // arrows appear (Draw checks stepPhase >= 2)
-            stepTimer = 0.6f;
+            stepTimer = 0.3f;
             break;
         case 3:
             nodes[stepNewIdx].state = LLState::Highlighted;
-            stepTimer = 0.6f;
+            stepTimer = 0.3f;
             break;
         default:
             nodes[stepNewIdx].state = LLState::Normal;
@@ -284,7 +283,7 @@ void LinkedListScreen::Draw() const {
         if (nd.state == LLState::Found) {
             fillC = Pal::NodeFound; bordC = {36,128,54,255}; textC = WHITE;
         } else if (nd.state == LLState::Highlighted) {
-            fillC = Pal::NodeHL; bordC = {200,160,0,255};
+            fillC = {76, 175, 80, 255}; bordC = {36, 128, 54, 255}; textC = WHITE;
         } else if (nd.state == LLState::Removing) {
             fillC = {255,200,200,255}; bordC = Pal::BtnDanger;
         }
