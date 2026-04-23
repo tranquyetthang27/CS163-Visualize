@@ -56,7 +56,7 @@ void LinkedListScreen::StartInsertStep(int idx, int v) {
     stepOp    = StepOp::Insert;
     stepActive = true;
     stepPhase  = 0;
-    stepTimer  = 0.5f;
+    stepTimer  = 0.7f;
     stepIdx    = idx;
     input.Clear();
 }
@@ -74,10 +74,10 @@ void LinkedListScreen::StartDeleteStep(int idx) {
     // Phase 0: if idx==0 mark immediately as Removing, else start traversal
     if (idx == 0) {
         nodes[0].state = LLState::Removing;
-        stepTimer = 0.5f;
+        stepTimer = 0.7f;
     } else {
         nodes[0].state = LLState::Highlighted;
-        stepTimer = 0.5f;
+        stepTimer = 0.7f;
     }
     input.Clear();
 }
@@ -93,12 +93,12 @@ void LinkedListScreen::AdvanceStep() {
         switch (stepPhase) {
             case 1:
                 nodes[stepIdx - 1].state = LLState::Highlighted;
-                stepTimer = 0.5f; break;
+                stepTimer = 0.7f; break;
             case 2:
-                stepTimer = 0.5f; break; // arrows appear
+                stepTimer = 0.7f; break; // arrows appear
             case 3:
                 nodes[stepIdx].state = LLState::Highlighted;
-                stepTimer = 0.5f; break;
+                stepTimer = 0.7f; break;
             default:
                 nodes[stepIdx].state = LLState::Normal;
                 stepActive = false; stepOp = StepOp::None;
@@ -118,12 +118,12 @@ void LinkedListScreen::AdvanceStep() {
         if (stepPhase < stepIdx) {
             // Still traversing: move pointer to next node
             nodes[stepPhase].state = LLState::Highlighted;
-            stepTimer = 0.5f;
+            stepTimer = 0.7f;
 
         } else if (stepPhase == stepIdx) {
             // Reached target: mark for deletion
             nodes[stepIdx].state = LLState::Removing;
-            stepTimer = 0.5f;
+            stepTimer = 0.7f;
 
         } else if (stepPhase == stepIdx + 1) {
             // Remove node, then color predecessor (orange) and successor (green)
@@ -134,7 +134,7 @@ void LinkedListScreen::AdvanceStep() {
                 nodes[pred].state = LLState::Predecessor;
             if (stepIdx < (int)nodes.size())
                 nodes[stepIdx].state = LLState::Highlighted;
-            stepTimer = 0.5f;
+            stepTimer = 0.7f;
 
         } else {
             // Done
@@ -145,7 +145,7 @@ void LinkedListScreen::AdvanceStep() {
     }
 }
 
-// ── Update ───────────────────────────────────────────────────────
+//Update
 
 Screen LinkedListScreen::Update() {
     float dt = GetFrameTime();
@@ -306,7 +306,7 @@ void LinkedListScreen::Draw() const {
 
     int n = (int)nodes.size();
 
-    // Arrows — hide arrows to/from new node until insert phase 2
+    // Arrows and hide arrows to/from new node until insert phase 2
     for (int i = 0; i < n - 1; i++) {
         if (stepActive && stepOp == StepOp::Insert && stepPhase < 2) {
             if (i == stepIdx || i + 1 == stepIdx) continue;
@@ -339,6 +339,46 @@ void LinkedListScreen::Draw() const {
         Rectangle r = {nd.x - NODE_R, nd.y - NODE_R, 2*NODE_R, 2*NODE_R};
         char buf[16]; snprintf(buf, sizeof(buf), "%d", nd.value);
         DrawTextInRect(fontBold, buf, r, 18.0f, textC);
+    }
+
+    // Code panel (shown during insert step)
+    if (stepActive && stepOp == StepOp::Insert) {
+        const char* codeLines[] = {
+            "node* newNode = new node(val);",
+            "node* cur = head;",
+            "for (int i = 0; i < idx; i++)",
+            "    cur = cur->next;",
+            "newNode->next = cur->next;",
+            "cur->next = newNode;"
+        };
+        constexpr int NUM_LINES = 6;
+
+        // Which lines to highlight per phase
+        bool hl[NUM_LINES] = {};
+        switch (stepPhase) {
+            case 0: hl[0] = true; break;
+            case 1: hl[1] = hl[2] = hl[3] = true; break;
+            case 2: hl[4] = hl[5] = true; break;
+            case 3: for (auto& h : hl) h = true; break;
+        }
+
+        constexpr float PX = 878, PY = 86;
+        constexpr float PW = 385, LH = 22;
+        float PH = 14 + NUM_LINES * LH + 8;
+
+        DrawRectangleRounded({PX, PY, PW, PH}, 0.1f, 8, {28, 35, 51, 235});
+        DrawRectangleRoundedLines({PX, PY, PW, PH}, 0.1f, 8, {63, 81, 181, 200});
+        DrawTextEx(fontBold, "Insert — C++", {PX + 10, PY + 4}, 12.0f, 1.0f, {148, 163, 183, 255});
+
+        for (int i = 0; i < NUM_LINES; i++) {
+            float ly = PY + 18 + i * LH;
+            if (hl[i]) {
+                DrawRectangleRec({PX + 4, ly - 1, PW - 8, LH - 2}, {76, 175, 80, 55});
+                DrawTextEx(fontRegular, codeLines[i], {PX + 10, ly + 2}, 13.0f, 1.0f, {144, 238, 144, 255});
+            } else {
+                DrawTextEx(fontRegular, codeLines[i], {PX + 10, ly + 2}, 13.0f, 1.0f, {160, 180, 200, 180});
+            }
+        }
     }
 
     // Bottom panel
