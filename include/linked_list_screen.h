@@ -2,7 +2,6 @@
 #include "screen.h"
 #include "button.h"
 #include "input_field.h"
-#include <functional>
 #include <vector>
 #include <string>
 
@@ -30,33 +29,16 @@ class LinkedListScreen {
     float       msgTimer;
     Color       msgColor;
 
-    // ── Step-by-step ──────────────────────────────────────────────
-    struct StepFrame {
-        std::string          desc;
-        std::vector<LLState> nodeStates; // per existing node
-        bool                 showPending = false;
-        bool                 isFinal     = false;
-    };
-
-    bool                   stepMode  = false;
-    int                    stepIdx   = 0;
-    std::vector<StepFrame> stepFrames;
-    std::function<void()>  stepFinalAction;
-    std::function<void()>  stepCancelAction;
-
-    // pending node shown before actual insert
-    bool   hasPendingNode   = false;
-    LLNode pendingNode      = {};
-    int    pendingInsertIdx = 0;
-
-    Button btnNext, btnPrev, btnStop;
+    // Insert step-by-step (auto-play)
+    bool  stepActive  = false;
+    int   stepPhase   = 0;
+    float stepTimer   = 0.0f;
+    int   stepNewIdx  = -1;
 
     void LayoutNodes();
     void SetMsg(const char* msg, Color c = {46,160,67,255}, float dur = 2.5f);
-
-    void ApplyFrame(int i);
-    void ExitStepMode(bool execute);
-    void PrepareInsertSteps(int insertIdx, int v);
+    void StartInsertStep(int idx, int v);
+    void AdvanceStep();
 
 public:
     LinkedListScreen();
