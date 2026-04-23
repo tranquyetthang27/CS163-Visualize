@@ -208,8 +208,6 @@ GraphScreen::GraphScreen()
      btnBack({20, 20, 100, 36}, "< Back", Pal::BtnNeutral, Pal::BtnNeutHov),
      btnDelete({440, 636, 150, 40}, "Delete", Pal::BtnDanger, Pal::BtnDangHov),
      btnEdit({690, 636, 150, 40}, "Edit", Pal::BtnPrimary, Pal::BtnPrimHov),
-     btnKruskal({20, 620, 210, 32}, "Kruskal's Algorithm", Pal::BtnSuccess, Pal::BtnSuccHov),
-     btnPrim({240, 620, 190, 32}, "Prim's Algorithm", Pal::BtnPrimary, Pal::BtnPrimHov),
            btnEditOk({510, 416, 114, 34}, "OK", Pal::BtnSuccess, Pal::BtnSuccHov),
            btnEditCancel({636, 416, 114, 34}, "Cancel", Pal::BtnNeutral, Pal::BtnNeutHov),
            editField({410, 344, 330, 34}, "new value", 24),
@@ -225,17 +223,17 @@ GraphScreen::GraphScreen()
 
 
    edges = {
-       {0, 1, 7, true},
-       {0, 5, 9, true},
-       {0, 6, 14, true},
+       {0, 1, 5, true},
+       {0, 5, 4, true},
+       {0, 6, 6, true},
        {1, 2, 8, true},
-       {1, 5, 10, true},
-       {2, 3, 7, true},
-       {2, 4, 2, true},
+       {1, 5, 9, true},
+       {2, 3, 6, true},
+       {2, 4, 4, true},
        {3, 4, 6, true},
-       {4, 5, 11, true},
-       {5, 6, 2, true},
-       {3, 6, 9, true}
+       {4, 5, 33, true},
+       {5, 6, 5, true},
+       {3, 6, 5, true}
    };
 
 
@@ -352,17 +350,11 @@ void GraphScreen::SyncFieldsFromGraph(bool clearFocus) {
        if (!edge.visible) {
            continue;
        }
-
-
        if (!rows[edge.u].empty()) rows[edge.u] += ' ';
        rows[edge.u] += std::to_string(edge.v + indexBase) + "," + std::to_string(edge.w);
-
-
        if (!rows[edge.v].empty()) rows[edge.v] += ' ';
        rows[edge.v] += std::to_string(edge.u + indexBase) + "," + std::to_string(edge.w);
    }
-
-
    for (int i = 0; i < GRAPH_N; i++) {
        adjListFields[i].text = rows[i];
    }
@@ -380,15 +372,12 @@ bool GraphScreen::ApplyInputToGraph(bool showMessage) {
        nextEdges.push_back({u, v, w, true});
    };
 
-
    if (inputMode == GraphInputMode::EdgeList) {
        for (int i = 0; i < GRAPH_E; i++) {
            bool emptyRow = edgeFromFields[i].text.empty() && edgeToFields[i].text.empty() && edgeWeightFields[i].text.empty();
            if (emptyRow) {
                continue;
            }
-
-
            int u = 0;
            int v = 0;
            int w = 0;
@@ -504,7 +493,6 @@ void GraphScreen::ApplySelectedEdit() {
    SetMsg("Value updated.", Pal::BtnSuccess, 2.0f);
 }
 
-
 void GraphScreen::DeleteSelected() {
    if (selectionType == GraphSelectionType::None || selectedIndex < 0) {
        SetMsg("Click a node or edge first.", Pal::BtnDanger, 2.5f);
@@ -530,7 +518,6 @@ void GraphScreen::DeleteSelected() {
    SyncFieldsFromGraph(false);
 }
 
-
 float GraphScreen::GetInputContentHeight() const {
    switch (inputMode) {
        case GraphInputMode::EdgeList: return 356.0f;
@@ -553,13 +540,11 @@ void GraphScreen::ClampInputScroll() {
    if (inputScrollY > maxScroll) inputScrollY = maxScroll;
 }
 
-
 void GraphScreen::SetMsg(const char* msg, Color c, float dur) {
    message = msg;
    msgColor = c;
    msgTimer = dur;
 }
-
 
 Screen GraphScreen::Update() {
    float dt = GetFrameTime();
@@ -569,13 +554,9 @@ Screen GraphScreen::Update() {
            msgTimer = 0.0f;
        }
    }
-
-
    if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) {
        return Screen::Home;
    }
-
-
    Rectangle tabEdge = kTabEdge;
    Rectangle tabMatrix = kTabMatrix;
    Rectangle tabAdj = kTabAdj;
@@ -592,7 +573,6 @@ Screen GraphScreen::Update() {
            SetIndexBase(1);
        }
 
-
        if (CheckCollisionPointRec(mouse, tabEdge) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
            SetInputMode(GraphInputMode::EdgeList);
        }
@@ -603,14 +583,12 @@ Screen GraphScreen::Update() {
            SetInputMode(GraphInputMode::AdjacencyList);
        }
 
-
        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || GetMouseWheelMove() != 0.0f) {
            if (CheckCollisionPointRec(mouse, kInputContentArea)) {
                inputScrollY -= GetMouseWheelMove() * 32.0f;
                ClampInputScroll();
            }
        }
-
 
        float maxScroll = GetInputMaxScroll();
        if (maxScroll > 0.0f) {
@@ -749,14 +727,12 @@ Screen GraphScreen::Update() {
                float minY = 72.0f + kNodeRadius + 8.0f;
                float maxY = 610.0f - kNodeRadius - 8.0f;
 
-
                float nextX = mouse.x + draggingOffset.x;
                float nextY = mouse.y + draggingOffset.y;
                if (nextX < minX) nextX = minX;
                if (nextX > maxX) nextX = maxX;
                if (nextY < minY) nextY = minY;
                if (nextY > maxY) nextY = maxY;
-
 
                nodes[i].x = nextX;
                nodes[i].y = nextY;
@@ -783,21 +759,12 @@ Screen GraphScreen::Update() {
    }
 
 
-   if (btnKruskal.Update()) {
-       RunKruskal();
-   }
-   if (btnPrim.Update()) {
-       RunPrim();
-   }
-
-
    return Screen::MST;
 }
 
 
 void GraphScreen::Draw() const {
    ClearBackground(Pal::BG);
-
 
    DrawRectangleRec({0, 0, 1280, 72}, Pal::Surface);
    DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
@@ -811,8 +778,6 @@ void GraphScreen::Draw() const {
        Pal::TxtLight
    );
    btnBack.Draw();
-
-
    DrawLineEx({860, 72}, {860, 610}, 1.0f, Pal::Border);
 
 
@@ -940,7 +905,6 @@ void GraphScreen::Draw() const {
    }
    EndScissorMode();
 
-
    if (maxScroll > 0.0f) {
        float thumbH = kScrollTrack.height * (kInputClip.height / GetInputContentHeight());
        if (thumbH < 34.0f) thumbH = 34.0f;
@@ -961,8 +925,6 @@ void GraphScreen::Draw() const {
 
    btnDelete.Draw();
    btnEdit.Draw();
-   btnKruskal.Draw();
-   btnPrim.Draw();
 
 
    if (selectionType == GraphSelectionType::Node && selectedIndex >= 0) {
@@ -1006,9 +968,6 @@ void GraphScreen::RunKruskal() {
       e.skipped = false;
   }
 
-
-
-
   // collect visible edge indices sorted by weight
   std::vector<int> order;
   for (int i = 0; i < (int)edges.size(); i++) {
@@ -1018,18 +977,12 @@ void GraphScreen::RunKruskal() {
       return edges[a].w < edges[b].w;
   });
 
-
-
-
   // union-find over visible nodes
   std::vector<int> parent(GRAPH_N);
   std::iota(parent.begin(), parent.end(), 0);
   std::function<int(int)> find = [&](int x) -> int {
       return parent[x] == x ? x : parent[x] = find(parent[x]);
   };
-
-
-
 
   int added = 0;
   for (int idx : order) {
@@ -1045,15 +998,10 @@ void GraphScreen::RunKruskal() {
       }
   }
 
-
-
-
   char buf[64];
   std::snprintf(buf, sizeof(buf), "Kruskal: MST found with %d edges.", added);
   SetMsg(buf, {46, 160, 67, 255}, 5.0f);
 }
-
-
 
 
 void GraphScreen::RunPrim() {
@@ -1061,9 +1009,6 @@ void GraphScreen::RunPrim() {
       e.inMST = false;
       e.skipped = false;
   }
-
-
-
 
   // find first visible node
   int start = -1;
@@ -1085,8 +1030,6 @@ void GraphScreen::RunPrim() {
   for (int i = 0; i < GRAPH_N; i++) if (nodes[i].visible) visibleCount++;
 
 
-
-
   while (added < visibleCount - 1) {
       int bestIdx = -1;
       int bestW = INT_MAX;
@@ -1103,9 +1046,6 @@ void GraphScreen::RunPrim() {
       inTree[edges[bestIdx].v] = true;
       added++;
   }
-
-
-
 
   char buf[64];
   std::snprintf(buf, sizeof(buf), "Prim: MST found with %d edges.", added);
