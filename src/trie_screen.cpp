@@ -2,6 +2,7 @@
 #include "font.h"
 #include "colors.h"
 #include "camera.h"
+#include "init_file.h"
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
@@ -17,6 +18,7 @@ TrieScreen::TrieScreen()
       btnSearch ({550, 636, 120, 40}, "Search",  Pal::BtnOrange,  Pal::BtnOrangeHov),
       btnClear  ({155, 636, 100, 40}, "Clear",   Pal::BtnDanger,  Pal::BtnDangHov),
       btnBack   ({20,  20,  100, 36}, "< Back",  Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnLoad   ({810, 636, 120, 40}, "Load File", Pal::BtnNeutral, Pal::BtnNeutHov),
       msgTimer(0), msgColor(Pal::BtnSuccess), root(0)
 {
     camera.target = (Vector2){ 640, TRIE_TOP_Y }; // Nhìn vào gốc của cây Trie
@@ -164,6 +166,11 @@ Screen TrieScreen::Update() {
         input.Clear();
     }
 
+    if (btnLoad.Update()) {
+        std::string fullPath = std::string(PROJECT_ROOT_PATH) + "data.txt";
+        OnLoadFileTriggered(fullPath); 
+    }
+
     return Screen::Trie;
 }
 
@@ -265,6 +272,7 @@ void TrieScreen::Draw(){
     btnClear.Draw();
     input.Draw();
     btnSearch.Draw();
+    btnLoad.Draw();
 
     if (msgTimer > 0 && !message.empty()) {
         float fade = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
@@ -276,3 +284,4 @@ void TrieScreen::Draw(){
     snprintf(cnt, sizeof(cnt), "Total Nodes: %d", (int)pool.size());
     DrawTextEx(fontRegular, cnt, {1140, 646}, 15.0f, 1.0f, Pal::TxtMid);
 }
+
