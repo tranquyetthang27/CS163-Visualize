@@ -285,3 +285,18 @@ void TrieScreen::Draw(){
     DrawTextEx(fontRegular, cnt, {1140, 646}, 15.0f, 1.0f, Pal::TxtMid);
 }
 
+void TrieScreen::OnLoadFileTriggered(const std::string& path) {
+    std::vector<std::string> wordList = InitFile::loadWords(path);
+    
+    if (wordList.empty()) {
+        SetMsg("Failed to load or file empty", Pal::BtnDanger);
+        return;
+    }
+
+    for (const std::string& w : wordList) {
+        InstantInsert(w);
+    }
+    
+    Layout(); 
+    SetMsg("File loaded successfully!");
+}
