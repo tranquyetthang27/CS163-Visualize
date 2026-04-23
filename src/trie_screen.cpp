@@ -285,3 +285,35 @@ void TrieScreen::Draw(){
     DrawTextEx(fontRegular, cnt, {1140, 646}, 15.0f, 1.0f, Pal::TxtMid);
 }
 
+void TrieScreen::InstantInsert(const std::string& word) {
+    int curr = root;
+    for (char c : word) {
+        int idx = c - 'a';
+        if (idx < 0 || idx >= 26) continue;
+        
+        if (pool[curr].children[idx] == -1) {
+            int newNodeIdx = (int)pool.size();
+            pool.emplace_back(c);
+            pool[newNodeIdx].alpha = 1.0f; 
+            pool[curr].children[idx] = newNodeIdx;
+        }
+        curr = pool[curr].children[idx];
+    }
+    pool[curr].isEnd = true;
+}
+
+void TrieScreen::OnLoadFileTriggered(const std::string& path) {
+    std::vector<std::string> wordList = InitFile::loadWords(path);
+    
+    if (wordList.empty()) {
+        SetMsg("Failed to load or file empty", Pal::BtnDanger);
+        return;
+    }
+
+    for (const std::string& w : wordList) {
+        InstantInsert(w);
+    }
+    
+    Layout(); 
+    SetMsg("File loaded successfully!");
+}
