@@ -18,28 +18,33 @@ constexpr int kMaxGraphN = 26;
 constexpr int kMaxGraphE = 50;
 
 constexpr Rectangle kInputPanel = {872, 86, 388, 516};
-constexpr Rectangle kInputContentArea = {884, 306, 360, 246};
-constexpr Rectangle kInputClip = {892, 340, 334, 196};
-constexpr Rectangle kScrollTrack = {1236, 314, 8, 222};
+constexpr Rectangle kInputContentArea = {884, 236, 360, 316};
+constexpr Rectangle kInputClip = {892, 270, 334, 266};
+constexpr Rectangle kScrollTrack = {1236, 244, 8, 292};
 
-constexpr float kEdgeListSttX = 894.0f;
-constexpr float kEdgeListUX = 936.0f;
-constexpr float kEdgeListVX = 992.0f;
-constexpr float kEdgeListWX = 1048.0f;
-constexpr float kEdgeListWeightW = 88.0f;
-constexpr float kEdgeListRowY = 356.0f;
-constexpr float kEdgeListRowGap = 24.0f;
+// Edge List columns: No. | U (56px) | V (56px) | W (150px), 8px gaps
+constexpr float kEdgeListSttX = 896.0f;
+constexpr float kEdgeListUX   = 922.0f;
+constexpr float kEdgeListVX   = 986.0f;
+constexpr float kEdgeListWX   = 1050.0f;
+constexpr float kEdgeListWeightW = 150.0f;
+constexpr float kEdgeListHeaderY = 271.0f;
+constexpr float kEdgeListRowY    = 293.0f;
+constexpr float kEdgeListRowGap  = 22.0f;
 
-constexpr float kMatrixColX = 936.0f;
-constexpr float kMatrixRowY = 363.0f;
-constexpr float kMatrixGap = 33.0f;
+// Adjacency Matrix: 9 columns max, 30px per column
+constexpr float kMatrixColX  = 934.0f;
+constexpr float kMatrixRowY  = 293.0f;
+constexpr float kMatrixGap   = 30.0f;
+constexpr float kMatrixHeaderY = 271.0f;
 
-constexpr float kAdjRowY = 369.0f;
-constexpr float kAdjRowGap = 36.0f;
+// Adjacency List
+constexpr float kAdjRowY    = 275.0f;
+constexpr float kAdjRowGap  = 26.0f;
 
-constexpr Rectangle kTabEdge = {884, 176, 360, 34};
-constexpr Rectangle kTabMatrix = {884, 218, 360, 34};
-constexpr Rectangle kTabAdj = {884, 260, 360, 34};
+constexpr Rectangle kTabEdge = {884, 106, 360, 34};
+constexpr Rectangle kTabMatrix = {884, 148, 360, 34};
+constexpr Rectangle kTabAdj = {884, 190, 360, 34};
 
 bool ParseIntStrict(const std::string& text, int* value) {
     if (text.empty()) {
@@ -110,27 +115,27 @@ bool DrawModeTab(Rectangle rect, const char* label, bool active) {
 
 void LayoutEdgeListFields(InputField* fromFields, InputField* toFields, InputField* weightFields, float scrollY, int count) {
     for (int i = 0; i < count; i++) {
-        float y = 337.0f + i * 25.0f - scrollY;
-        fromFields[i].rect = {kEdgeListUX, y, 46.0f, 22.0f};
-        toFields[i].rect = {kEdgeListVX, y, 46.0f, 22.0f};
-        weightFields[i].rect = {kEdgeListWX, y, kEdgeListWeightW, 22.0f};
+        float y = kEdgeListRowY + i * kEdgeListRowGap - scrollY;
+        fromFields[i].rect = {kEdgeListUX, y, 56.0f, 20.0f};
+        toFields[i].rect   = {kEdgeListVX, y, 56.0f, 20.0f};
+        weightFields[i].rect = {kEdgeListWX, y, kEdgeListWeightW, 20.0f};
     }
 }
 
 void LayoutMatrixFields(InputField fields[kMaxGraphN][kMaxGraphN], float scrollY, int n) {
     for (int r = 0; r < n; r++) {
         for (int c = 0; c < n; c++) {
-            float x = 929.0f + c * kMatrixGap;
-            float y = 334.0f + r * kMatrixGap - scrollY;
-            fields[r][c].rect = {x, y, 28.0f, 22.0f};
+            float x = kMatrixColX + c * kMatrixGap;
+            float y = kMatrixRowY + r * kMatrixGap - scrollY;
+            fields[r][c].rect = {x, y, 26.0f, 20.0f};
         }
     }
 }
 
 void LayoutAdjListFields(InputField* fields, float scrollY, int n) {
     for (int i = 0; i < n; i++) {
-        float y = 338.0f + i * kAdjRowGap - scrollY;
-        fields[i].rect = {952.0f, y, 240.0f, 24.0f};
+        float y = kAdjRowY + i * kAdjRowGap - scrollY;
+        fields[i].rect = {930.0f, y, 270.0f, 20.0f};
     }
 }
 
@@ -176,22 +181,24 @@ GraphScreen::GraphScreen()
             editDialogOpen(false),
             addEdgePendingU(-1),
             addEdgePendingV(-1),
+            addNodePendingX(0.0f),
+            addNodePendingY(0.0f),
                         draggingNodeIndex(-1),
                         draggingOffset({0.0f, 0.0f}),
             inputScrollY(0.0f),
             inputScrollDragging(false),
             inputScrollDragOffset(0.0f),
       btnBack({20, 20, 100, 36}, "< Back", Pal::BtnNeutral, Pal::BtnNeutHov),
-      btnDelete({440, 636, 150, 40}, "Delete", Pal::BtnDanger, Pal::BtnDangHov),
-      btnEdit({690, 636, 150, 40}, "Edit", Pal::BtnPrimary, Pal::BtnPrimHov),
-      btnKruskal({20, 620, 210, 32}, "Kruskal's Algorithm", Pal::BtnSuccess, Pal::BtnSuccHov),
-      btnPrim({240, 620, 190, 32}, "Prim's Algorithm", Pal::BtnPrimary, Pal::BtnPrimHov),
+      btnDelete({20, 642, 190, 40}, "Delete", Pal::BtnDanger, Pal::BtnDangHov),
+      btnEdit({230, 642, 190, 40}, "Edit", Pal::BtnPrimary, Pal::BtnPrimHov),
+      btnKruskal({440, 642, 190, 40}, "Kruskal's Algorithm", Pal::BtnSuccess, Pal::BtnSuccHov),
+      btnPrim({650, 642, 190, 40}, "Prim's Algorithm", Pal::BtnPrimary, Pal::BtnPrimHov),
       mstCurrentStep(0),
       mstActive(false),
       mstStepTimer(0.0f),
-            btnEditOk({510, 416, 114, 34}, "OK", Pal::BtnSuccess, Pal::BtnSuccHov),
-            btnEditCancel({636, 416, 114, 34}, "Cancel", Pal::BtnNeutral, Pal::BtnNeutHov),
-            editField({410, 344, 330, 34}, "new value", 24),
+            btnEditOk({360, 388, 272, 40}, "OK", Pal::BtnSuccess, Pal::BtnSuccHov),
+            btnEditCancel({648, 388, 272, 40}, "Cancel", Pal::BtnNeutral, Pal::BtnNeutHov),
+            editField({360, 328, 560, 38}, "new value", 24),
       msgTimer(0.0f),
       msgColor(Pal::TxtMid) {
     nodes[0] = {200, 200, "A", true};
@@ -325,10 +332,10 @@ void GraphScreen::SyncFieldsFromGraph(bool clearFocus) {
             continue;
         }
         if (!rows[edge.u].empty()) rows[edge.u] += ' ';
-        rows[edge.u] += std::to_string(edge.v + indexBase) + "," + std::to_string(edge.w);
+        rows[edge.u] += nodes[edge.v].label + "," + std::to_string(edge.w);
 
         if (!rows[edge.v].empty()) rows[edge.v] += ' ';
-        rows[edge.v] += std::to_string(edge.u + indexBase) + "," + std::to_string(edge.w);
+        rows[edge.v] += nodes[edge.u].label + "," + std::to_string(edge.w);
     }
 
     for (int i = 0; i < nodeCount; i++) {
@@ -386,16 +393,24 @@ bool GraphScreen::ApplyInputToGraph(bool showMessage) {
             std::istringstream row(adjListFields[r].text);
             std::string token;
             while (row >> token) {
-                int neighbor = 0;
-                int weight = 0;
-                if (!ParsePairToken(token, &neighbor, &weight)) {
+                size_t sep = token.find_first_of(",:/-");
+                if (sep == std::string::npos || sep == 0 || sep + 1 >= token.size()) {
                     if (showMessage) {
-                        SetMsg("Adjacency List uses neighbor,weight tokens.", Pal::BtnDanger, 2.5f);
+                        SetMsg("Adjacency List: use label,weight (e.g. B,7).", Pal::BtnDanger, 2.5f);
                     }
                     return false;
                 }
-
-                neighbor -= indexBase;
+                std::string neighborStr = token.substr(0, sep);
+                std::string weightStr   = token.substr(sep + 1);
+                int neighbor = 0;
+                int weight   = 0;
+                if (!ParseNodeRef(neighborStr, indexBase, nodes, nodeCount, &neighbor) ||
+                    !ParseIntStrict(weightStr, &weight)) {
+                    if (showMessage) {
+                        SetMsg("Adjacency List: use label,weight (e.g. B,7).", Pal::BtnDanger, 2.5f);
+                    }
+                    return false;
+                }
                 if (neighbor > r) {
                     addEdge(r, neighbor, weight);
                 }
@@ -437,6 +452,18 @@ void GraphScreen::OpenEditDialog() {
 void GraphScreen::ApplySelectedEdit() {
     if (!editDialogOpen) return;
 
+    if (editTarget == GraphEditTarget::AddNodeLabel) {
+        if (editField.text.empty()) {
+            SetMsg("Node label cannot be empty.", Pal::BtnDanger, 2.5f);
+            return;
+        }
+        AddNodeAt(addNodePendingX, addNodePendingY, editField.text);
+        editDialogOpen = false;
+        editTarget = GraphEditTarget::None;
+        ClearInputFocus();
+        return;
+    }
+
     if (editTarget == GraphEditTarget::AddEdgeWeight) {
         int weight = 0;
         if (!ParseIntStrict(editField.text, &weight) || weight <= 0) {
@@ -450,7 +477,7 @@ void GraphScreen::ApplySelectedEdit() {
         editTarget = GraphEditTarget::None;
         ClearInputFocus();
         SyncFieldsFromGraph(false);
-        SetMsg("Them canh thanh cong!", Pal::BtnSuccess, 2.0f);
+        SetMsg("Edge added!", Pal::BtnSuccess, 2.0f);
         return;
     }
 
@@ -505,11 +532,14 @@ void GraphScreen::DeleteSelected() {
 
 float GraphScreen::GetInputContentHeight() const {
     switch (inputMode) {
-        case GraphInputMode::EdgeList: return 30.0f + MAX_GRAPH_E * 25.0f;
-        case GraphInputMode::AdjacencyMatrix: return 30.0f + std::min(nodeCount, 10) * kMatrixGap;
-        case GraphInputMode::AdjacencyList: return 30.0f + nodeCount * kAdjRowGap;
+        case GraphInputMode::EdgeList:
+            return (kEdgeListRowY - kInputClip.y) + MAX_GRAPH_E * kEdgeListRowGap + 8.0f;
+        case GraphInputMode::AdjacencyMatrix:
+            return (kMatrixRowY - kInputClip.y) + std::min(nodeCount, 9) * kMatrixGap + 8.0f;
+        case GraphInputMode::AdjacencyList:
+            return (kAdjRowY - kInputClip.y) + nodeCount * kAdjRowGap + 8.0f;
     }
-    return 356.0f;
+    return 400.0f;
 }
 
 float GraphScreen::GetInputMaxScroll() const {
@@ -529,9 +559,9 @@ void GraphScreen::SetMsg(const char* msg, Color c, float dur) {
     msgTimer = dur;
 }
 
-void GraphScreen::AddNodeAt(float x, float y) {
+void GraphScreen::AddNodeAt(float x, float y, const std::string& label) {
     if (nodeCount >= MAX_GRAPH_N) {
-        SetMsg("Toi da 26 dinh.", Pal::BtnDanger, 2.5f);
+        SetMsg("Maximum 26 nodes reached.", Pal::BtnDanger, 2.5f);
         return;
     }
     float minX = kNodeRadius + 8.0f;
@@ -541,12 +571,11 @@ void GraphScreen::AddNodeAt(float x, float y) {
     x = std::max(minX, std::min(maxX, x));
     y = std::max(minY, std::min(maxY, y));
 
-    std::string label(1, static_cast<char>('A' + nodeCount));
     nodes[nodeCount] = {x, y, label, true};
     nodeCount++;
     SyncFieldsFromGraph(false);
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "Them dinh %s.", label.c_str());
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "Node %s added.", label.c_str());
     SetMsg(buf, Pal::BtnSuccess, 2.0f);
 }
 
@@ -566,17 +595,9 @@ Screen GraphScreen::Update() {
     Rectangle tabEdge = kTabEdge;
     Rectangle tabMatrix = kTabMatrix;
     Rectangle tabAdj = kTabAdj;
-    Rectangle idx0 = {890, 138, 74, 26};
-    Rectangle idx1 = {972, 138, 74, 26};
 
     Vector2 mouse = GetMousePosition();
     if (!editDialogOpen) {
-        if (CheckCollisionPointRec(mouse, idx0) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            SetIndexBase(0);
-        }
-        if (CheckCollisionPointRec(mouse, idx1) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            SetIndexBase(1);
-        }
 
         if (CheckCollisionPointRec(mouse, tabEdge) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             SetInputMode(GraphInputMode::EdgeList);
@@ -624,7 +645,7 @@ Screen GraphScreen::Update() {
         }
 
         ClampInputScroll();
-        int matrixDisplayN = std::min(nodeCount, 10);
+        int matrixDisplayN = std::min(nodeCount, 9);
         if (inputMode == GraphInputMode::EdgeList) {
             LayoutEdgeListFields(edgeFromFields, edgeToFields, edgeWeightFields, inputScrollY, MAX_GRAPH_E);
             for (int i = 0; i < MAX_GRAPH_E; i++) {
@@ -721,10 +742,19 @@ Screen GraphScreen::Update() {
                     selectedIndex = hitEdge;
                     draggingNodeIndex = -1;
                 } else {
-                    // Click on empty canvas: add a new node
+                    // Click on empty canvas: prompt for node label
                     ClearSelection();
                     draggingNodeIndex = -1;
-                    AddNodeAt(mouse.x, mouse.y);
+                    if (nodeCount < MAX_GRAPH_N) {
+                        addNodePendingX = mouse.x;
+                        addNodePendingY = mouse.y;
+                        editTarget = GraphEditTarget::AddNodeLabel;
+                        editDialogOpen = true;
+                        editField.focused = true;
+                        editField.Clear();
+                    } else {
+                        SetMsg("Maximum 26 nodes reached.", Pal::BtnDanger, 2.5f);
+                    }
                 }
             }
         }
@@ -787,7 +817,7 @@ Screen GraphScreen::Update() {
             } else {
                 int total = mstSteps.empty() ? 0 : mstSteps.back().cumulativeWeight;
                 char buf[64];
-                std::snprintf(buf, sizeof(buf), "Hoan thanh! Tong trong so MST: %d", total);
+                std::snprintf(buf, sizeof(buf), "Done! Total MST weight: %d", total);
                 SetMsg(buf, {46, 160, 67, 255}, 5.0f);
             }
         }
@@ -902,16 +932,6 @@ void GraphScreen::Draw() const {
     DrawRectangleRec({872, 86, 388, 516}, Pal::Panel);
     DrawRectangleRoundedLines({872, 86, 388, 516}, 0.12f, 8, Pal::Border);
 
-    DrawTextEx(fontBold, "Input Graph", {892, 102}, 18.0f, 1.0f, Pal::TxtDark);
-    DrawTextEx(fontRegular, "Choose one format, then type directly into the live table.", {892, 124}, 12.0f, 1.0f, Pal::TxtLight);
-
-    Rectangle idx0 = {890, 138, 74, 26};
-    Rectangle idx1 = {972, 138, 74, 26};
-    DrawModeTab(idx0, "0", indexBase == 0);
-    DrawModeTab(idx1, "1", indexBase == 1);
-
-    DrawTextEx(fontBold, "Indexing", {1080, 145}, 13.0f, 1.0f, Pal::TxtMid);
-
     DrawModeTab(kTabEdge, "Edge List", inputMode == GraphInputMode::EdgeList);
     DrawModeTab(kTabMatrix, "Adjacency Matrix", inputMode == GraphInputMode::AdjacencyMatrix);
     DrawModeTab(kTabAdj, "Adjacency List", inputMode == GraphInputMode::AdjacencyList);
@@ -924,47 +944,37 @@ void GraphScreen::Draw() const {
     if (scrollY < 0.0f) scrollY = 0.0f;
     if (scrollY > maxScroll) scrollY = maxScroll;
 
-    int matrixDisplayN = std::min(nodeCount, 10);
+    int matrixDisplayN = std::min(nodeCount, 9);
     BeginScissorMode((int)kInputClip.x, (int)kInputClip.y, (int)kInputClip.width, (int)kInputClip.height);
     if (inputMode == GraphInputMode::EdgeList) {
-        DrawFixedHeader("Edge List", "U, V, and weight for each edge.");
-        DrawTextEx(fontBold, "No.", {kEdgeListSttX, 340}, 12.0f, 1.0f, Pal::TxtLight);
-        DrawTextEx(fontBold, "U", {kEdgeListUX, 340}, 12.0f, 1.0f, Pal::TxtLight);
-        DrawTextEx(fontBold, "V", {kEdgeListVX, 340}, 12.0f, 1.0f, Pal::TxtLight);
-        DrawTextEx(fontBold, "W", {kEdgeListWX, 340}, 12.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, "No.", {kEdgeListSttX,  kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, "U",  {kEdgeListUX,     kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, "V",  {kEdgeListVX,     kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, "W",  {kEdgeListWX,     kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
 
         for (int i = 0; i < MAX_GRAPH_E; i++) {
             char rowNo[8];
             std::snprintf(rowNo, sizeof(rowNo), "%02d", i + 1);
-            DrawTextEx(fontRegular, rowNo, {kEdgeListSttX, kEdgeListRowY + i * kEdgeListRowGap - scrollY}, 12.0f, 1.0f, Pal::TxtMid);
+            DrawTextEx(fontRegular, rowNo, {kEdgeListSttX, kEdgeListRowY + i * kEdgeListRowGap - scrollY + 2.0f}, 11.0f, 1.0f, Pal::TxtMid);
             edgeFromFields[i].Draw();
             edgeToFields[i].Draw();
             edgeWeightFields[i].Draw();
         }
     } else if (inputMode == GraphInputMode::AdjacencyMatrix) {
-        DrawFixedHeader("Adjacency Matrix", "Rows and columns (max 10 shown).");
-
         for (int c = 0; c < matrixDisplayN; c++) {
-            char label[8];
-            std::snprintf(label, sizeof(label), "%d", c + indexBase);
-            DrawTextEx(fontBold, label, {kMatrixColX + c * kMatrixGap, 322.0f}, 12.0f, 1.0f, Pal::TxtLight);
+            DrawTextEx(fontBold, nodes[c].label.c_str(), {kMatrixColX + c * kMatrixGap + 7.0f, kMatrixHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
         }
 
         for (int r = 0; r < matrixDisplayN; r++) {
-            char label[8];
-            std::snprintf(label, sizeof(label), "%d", r + indexBase);
-            DrawTextEx(fontBold, label, {905.0f, kMatrixRowY + r * kMatrixGap - scrollY}, 12.0f, 1.0f, Pal::TxtLight);
+            DrawTextEx(fontBold, nodes[r].label.c_str(), {910.0f, kMatrixRowY + r * kMatrixGap - scrollY + 3.0f}, 11.0f, 1.0f, Pal::TxtLight);
             for (int c = 0; c < matrixDisplayN; c++) {
                 matrixFields[r][c].Draw();
             }
         }
     } else {
-        DrawFixedHeader("Adjacency List", "Each row: neighbor,weight pairs separated by spaces.");
 
         for (int i = 0; i < nodeCount; i++) {
-            char label[8];
-            std::snprintf(label, sizeof(label), "%d", i + indexBase);
-            DrawTextEx(fontBold, label, {902.0f, kAdjRowY + i * kAdjRowGap - scrollY}, 13.0f, 1.0f, Pal::TxtMid);
+            DrawTextEx(fontBold, nodes[i].label.c_str(), {902.0f, kAdjRowY + i * kAdjRowGap - scrollY + 2.0f}, 11.0f, 1.0f, Pal::TxtMid);
             adjListFields[i].Draw();
         }
     }
@@ -990,8 +1000,8 @@ void GraphScreen::Draw() const {
 
     if (mstActive) {
         char stepBuf[48];
-        std::snprintf(stepBuf, sizeof(stepBuf), "Buoc %d / %d", mstCurrentStep, (int)mstSteps.size());
-        DrawTextEx(fontRegular, stepBuf, {20, 664}, 13.0f, 1.0f, Pal::TxtMid);
+        std::snprintf(stepBuf, sizeof(stepBuf), "Step %d / %d", mstCurrentStep, (int)mstSteps.size());
+        DrawTextEx(fontRegular, stepBuf, {20, 694}, 13.0f, 1.0f, Pal::TxtMid);
     }
 
 
@@ -1006,13 +1016,16 @@ void GraphScreen::Draw() const {
         DrawRectangleRounded({330, 240, 620, 210}, 0.08f, 10, Pal::Surface);
         DrawRectangleRoundedLines({330, 240, 620, 210}, 0.08f, 10, Pal::Border);
 
-        const char* dlgTitle = (editTarget == GraphEditTarget::NodeLabel) ? "Edit Node"
-                             : (editTarget == GraphEditTarget::AddEdgeWeight) ? "Them canh moi" : "Edit Edge";
-        const char* dlgHint  = (editTarget == GraphEditTarget::NodeLabel) ? "Enter a new node label and confirm."
-                             : (editTarget == GraphEditTarget::AddEdgeWeight) ? "Nhap trong so canh (so nguyen duong)."
+        const char* dlgTitle = (editTarget == GraphEditTarget::NodeLabel)    ? "Edit Node"
+                             : (editTarget == GraphEditTarget::AddNodeLabel)  ? "Add Node"
+                             : (editTarget == GraphEditTarget::AddEdgeWeight) ? "Add Edge" : "Edit Edge";
+        const char* dlgHint  = (editTarget == GraphEditTarget::NodeLabel)    ? "Enter a new node label and confirm."
+                             : (editTarget == GraphEditTarget::AddNodeLabel)  ? "Enter a label for the new node."
+                             : (editTarget == GraphEditTarget::AddEdgeWeight) ? "Enter edge weight (positive integer)."
                              : "Enter a new edge weight and confirm.";
-        DrawTextEx(fontBold, dlgTitle, {360, 264}, 24.0f, 1.0f, Pal::TxtDark);
-        DrawTextEx(fontRegular, dlgHint, {360, 296}, 13.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, dlgTitle, {360, 258}, 22.0f, 1.0f, Pal::TxtDark);
+        DrawTextEx(fontRegular, dlgHint, {360, 284}, 13.0f, 1.0f, Pal::TxtLight);
+        DrawLineEx({360, 374}, {920, 374}, 1.0f, Pal::Border);
         editField.Draw();
         btnEditOk.Draw();
         btnEditCancel.Draw();
@@ -1056,7 +1069,7 @@ void GraphScreen::RunKruskal() {
     mstCurrentStep = 0;
     mstActive = true;
     mstStepTimer = 0.8f;
-    SetMsg("Kruskal: dang chay tung buoc...", Pal::TxtMid, 3.0f);
+    SetMsg("Kruskal: running step by step...", Pal::TxtMid, 3.0f);
 }
 
 
@@ -1105,6 +1118,6 @@ void GraphScreen::RunPrim() {
     mstCurrentStep = 0;
     mstActive = true;
     mstStepTimer = 0.8f;
-    SetMsg("Prim: dang chay tung buoc...", Pal::TxtMid, 3.0f);
+    SetMsg("Prim: running step by step...", Pal::TxtMid, 3.0f);
 }
 

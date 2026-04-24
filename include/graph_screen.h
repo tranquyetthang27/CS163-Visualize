@@ -39,7 +39,8 @@ enum class GraphEditTarget {
     None,
     NodeLabel,
     EdgeWeight,
-    AddEdgeWeight
+    AddEdgeWeight,
+    AddNodeLabel
 };
 
 class GraphScreen {
@@ -60,6 +61,8 @@ class GraphScreen {
     bool editDialogOpen;
     int addEdgePendingU;
     int addEdgePendingV;
+    float addNodePendingX;
+    float addNodePendingY;
 
     int draggingNodeIndex;
     Vector2 draggingOffset;
@@ -100,7 +103,7 @@ class GraphScreen {
     void OpenEditDialog();
     void ApplySelectedEdit();
     void DeleteSelected();
-    void AddNodeAt(float x, float y);
+    void AddNodeAt(float x, float y, const std::string& label);
     float GetInputContentHeight() const;
     float GetInputMaxScroll() const;
     void ClampInputScroll();
