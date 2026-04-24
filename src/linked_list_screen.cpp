@@ -9,20 +9,19 @@
 static constexpr float NODE_R    = 30.0f;
 static constexpr float NODE_GAP  = 44.0f;
 static constexpr float NODE_Y    = 360.0f;
-static constexpr int   MAX_NODES = 12;
 
 LinkedListScreen::LinkedListScreen()
-    : input({430, 630, 180, 40}, "Enter value...", 6),
-      btnInsert ({20,  630, 120, 40}, "Insert",      Pal::BtnPrimary, Pal::BtnPrimHov),
-      btnInsHead({20,  565,  57, 38}, "Head",        Pal::BtnPrimary, Pal::BtnPrimHov),
-      btnInsTail({82,  565,  57, 38}, "Tail",        Pal::BtnSuccess, Pal::BtnSuccHov),
-      btnInsIdx ({144, 565,  57, 38}, "Index",       Pal::Teal,       Pal::TealDark),
-      btnDel    ({620, 630, 100, 40}, "Delete",      Pal::BtnDanger,  Pal::BtnDangHov),
-      btnDelHead({620, 565,  47, 38}, "Head",        Pal::BtnDanger,  Pal::BtnDangHov),
-      btnDelTail({672, 565,  47, 38}, "Tail",        Pal::BtnOrange,  Pal::BtnOrangeHov),
-      btnDelIdx ({724, 565,  57, 38}, "Index",       Pal::Teal,       Pal::TealDark),
-      btnSearch ({730, 630, 100, 40}, "Search",      Pal::BtnOrange,  Pal::BtnOrangeHov),
-      btnUpdate ({845, 630, 100, 40}, "Update",      Pal::Teal,       Pal::TealDark),
+    : input({950, 16, 180, 40}, "Enter value...", 6),
+      btnInsert ({355, 630, 120, 40}, "Insert",      Pal::BtnPrimary, Pal::BtnPrimHov),
+      btnInsHead({355, 565,  57, 38}, "Head",        Pal::BtnPrimary, Pal::BtnPrimHov),
+      btnInsTail({417, 565,  57, 38}, "Tail",        Pal::BtnSuccess, Pal::BtnSuccHov),
+      btnInsIdx ({479, 565,  57, 38}, "Index",       Pal::Teal,       Pal::TealDark),
+      btnDel    ({505, 630, 120, 40}, "Delete",      Pal::BtnDanger,  Pal::BtnDangHov),
+      btnDelHead({505, 565,  47, 38}, "Head",        Pal::BtnDanger,  Pal::BtnDangHov),
+      btnDelTail({557, 565,  47, 38}, "Tail",        Pal::BtnOrange,  Pal::BtnOrangeHov),
+      btnDelIdx ({609, 565,  57, 38}, "Index",       Pal::Teal,       Pal::TealDark),
+      btnSearch ({655, 630, 120, 40}, "Search",      Pal::BtnOrange,  Pal::BtnOrangeHov),
+      btnUpdate ({805, 630, 120, 40}, "Update",      Pal::Teal,       Pal::TealDark),
       btnBack   ({20,  20,  100, 36}, "< Back",      Pal::BtnNeutral, Pal::BtnNeutHov),
       insertMenuOpen(false), deleteMenuOpen(false),
       msgTimer(0.0f), msgColor(Pal::BtnSuccess),
@@ -211,13 +210,11 @@ Screen LinkedListScreen::Update() {
     // Insert
     if (insHead) {
         int v; if (parseVal(v)) {
-            if ((int)nodes.size() >= MAX_NODES) SetMsg("List is full (max 12)!", {229,57,53,255});
-            else StartInsertStep(0, v);
+            StartInsertStep(0, v);
         }
     } else if (insTail) {
         int v; if (parseVal(v)) {
-            if ((int)nodes.size() >= MAX_NODES) SetMsg("List is full (max 12)!", {229,57,53,255});
-            else StartInsertStep((int)nodes.size(), v);
+            StartInsertStep((int)nodes.size(), v);
         }
     } else if (insIdx) {
         if (input.IsEmpty()) { SetMsg("Format: 'index value'  e.g. '1 50'", {229,57,53,255}); }
@@ -225,8 +222,6 @@ Screen LinkedListScreen::Update() {
             int idx, v;
             if (sscanf(input.text.c_str(), "%d %d", &idx, &v) != 2)
                 SetMsg("Format: 'index value'  e.g. '1 50'", {229,57,53,255});
-            else if ((int)nodes.size() >= MAX_NODES)
-                SetMsg("List is full (max 12)!", {229,57,53,255});
             else if (idx < 0 || idx > (int)nodes.size()) {
                 char buf[64]; snprintf(buf, sizeof(buf), "Index out of range (0-%d)!", (int)nodes.size());
                 SetMsg(buf, {229,57,53,255});
@@ -392,15 +387,15 @@ void LinkedListScreen::Draw() const {
 
     btnInsert.Draw();
     if (insertMenuOpen) {
-        DrawRectangleRounded({15, 558, 191, 52}, 0.2f, 8, Pal::Surface);
-        DrawRectangleRoundedLines({15, 558, 191, 52}, 0.2f, 8, Pal::Border);
+        DrawRectangleRounded({350, 558, 191, 52}, 0.2f, 8, Pal::Surface);
+        DrawRectangleRoundedLines({350, 558, 191, 52}, 0.2f, 8, Pal::Border);
         btnInsHead.Draw(); btnInsTail.Draw(); btnInsIdx.Draw();
     }
     input.Draw();
     btnDel.Draw();
     if (deleteMenuOpen) {
-        DrawRectangleRounded({615, 558, 171, 52}, 0.2f, 8, Pal::Surface);
-        DrawRectangleRoundedLines({615, 558, 171, 52}, 0.2f, 8, Pal::Border);
+        DrawRectangleRounded({500, 558, 171, 52}, 0.2f, 8, Pal::Surface);
+        DrawRectangleRoundedLines({500, 558, 171, 52}, 0.2f, 8, Pal::Border);
         btnDelHead.Draw(); btnDelTail.Draw(); btnDelIdx.Draw();
     }
     btnSearch.Draw();
@@ -409,9 +404,9 @@ void LinkedListScreen::Draw() const {
     if (msgTimer > 0 && !message.empty()) {
         float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
         Color c = msgColor; c.a = (unsigned char)(alpha * 220);
-        DrawTextEx(fontRegular, message.c_str(), {960, 640}, 16.0f, 1.0f, c);
+        DrawTextEx(fontRegular, message.c_str(), {480, 648}, 16.0f, 1.0f, c);
     }
 
-    char cnt[32]; snprintf(cnt, sizeof(cnt), "Nodes: %d / %d", (int)nodes.size(), MAX_NODES);
+    char cnt[32]; snprintf(cnt, sizeof(cnt), "Nodes: %d", (int)nodes.size());
     DrawTextEx(fontRegular, cnt, {1150, 640}, 14.0f, 1.0f, Pal::TxtLight);
 }
