@@ -24,8 +24,8 @@ HomeScreen::HomeScreen()
                     Screen::Heap, "Heap",
                     "Binary heap relationships", Pal::Amber);
     cards[3] = Card({padX + cardW + gap, topY + cardH + gap, cardW, cardH},
-                    Screen::MST, "Minimum Spanning Tree",
-                    "Kruskal's algorithm step-by-step", Pal::Coral);
+                    Screen::MST, "Graph",
+                    "Kruskal's and Prim's algorithm step-by-step", Pal::Coral);
 }
 
 Screen HomeScreen::Update() {
@@ -41,7 +41,7 @@ Screen HomeScreen::Update() {
 void HomeScreen::Draw() const {
     ClearBackground(gSettings.GetBG());
 
-    DrawTextCentered(fontBold,    "Data Structure Visualization",
+    DrawTextCentered(fontBold,    "VisuAlgo",
                      42.0f, 38.0f, Pal::TxtDark);
     DrawTextCentered(fontRegular, "Select a visualizer module",
                      90.0f, 17.0f, Pal::TxtMid);

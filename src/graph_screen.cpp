@@ -738,7 +738,7 @@ void GraphScreen::Draw() const {
 
     DrawRectangleRec({0, 0, 1280, 72}, Pal::Surface);
     DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
-    DrawTextEx(fontBold, "Graph Input", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
+    DrawTextEx(fontBold, "Minimum spanning tree", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
     DrawTextEx(
         fontRegular,
         "Left: graph preview. Right: choose input style (Edge List / Matrix / List).",
