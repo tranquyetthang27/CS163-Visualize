@@ -786,7 +786,7 @@ Screen GraphScreen::Update() {
             OpenEditDialog();
         }
     } else {
-        editField.Update();
+        editField.UpdateFocused();
         if (btnEditOk.Update() || IsKeyPressed(KEY_ENTER)) {
             ApplySelectedEdit();
         }

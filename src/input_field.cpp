@@ -14,7 +14,21 @@ void InputField::Update() {
     cursorBlink += GetFrameTime();
     if (cursorBlink > 1.0f) cursorBlink = 0.0f;
 
-    // Character input
+    int key = GetCharPressed();
+    while (key > 0) {
+        if (key >= 32 && (int)text.size() < maxLen)
+            text += (char)key;
+        key = GetCharPressed();
+    }
+    if (IsKeyPressed(KEY_BACKSPACE) && !text.empty())
+        text.pop_back();
+}
+
+void InputField::UpdateFocused() {
+    focused = true;
+    cursorBlink += GetFrameTime();
+    if (cursorBlink > 1.0f) cursorBlink = 0.0f;
+
     int key = GetCharPressed();
     while (key > 0) {
         if (key >= 32 && (int)text.size() < maxLen)

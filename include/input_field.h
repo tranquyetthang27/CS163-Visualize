@@ -14,6 +14,7 @@ struct InputField {
     InputField(Rectangle r, const char* ph, int ml = 12);
 
     void Update();
+    void UpdateFocused();
     void Draw() const;
     void Clear() { text.clear(); }
     bool IsEmpty() const { return text.empty(); }
