@@ -17,7 +17,7 @@ HeapScreen::HeapScreen()
       btnDelMax ({460, 636, 140, 40}, "Delete Max", Pal::BtnDanger,  Pal::BtnDangHov),
       btnBack   ({20,  20,  100, 36}, "< Back",     Pal::BtnNeutral, Pal::BtnNeutHov),
       msgTimer(0), msgColor(Pal::BtnSuccess),
-      animA(-1), animB(-1), animC(-1), idCurrent(0), stepTimer(0), doingInsert(false), doingDelete(false), isHighlight(false)
+      animA(-1), animB(-1), animC(-1), idCurrent(0), stepTimer(0), doingInsert(false), doingDelete(false), isHighlight(false), isStepByStep(true)
 {}
 
 void HeapScreen::GetNodePos(int i, float& x, float& y) const {

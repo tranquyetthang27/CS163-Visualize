@@ -35,6 +35,8 @@ class HeapScreen {
     bool  doingDelete;
     bool  isHighlight;
 
+    bool isStepByStep;
+
     static constexpr int MAX_SIZE = 15;
 
     void ComputePositions();
