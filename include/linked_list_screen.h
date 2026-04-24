@@ -34,6 +34,9 @@ class LinkedListScreen {
     bool   showCode   = false;
     Button btnShowCode;
 
+    float  scrollX = 0.0f;
+    Button btnScrollLeft, btnScrollRight;
+
     // Step-by-step (insert & delete)
     StepOp stepOp     = StepOp::None;
     bool   stepActive = false;

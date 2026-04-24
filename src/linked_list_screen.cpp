@@ -25,14 +25,16 @@ LinkedListScreen::LinkedListScreen()
       btnBack   ({20,  20,  100, 36}, "< Back",      Pal::BtnNeutral, Pal::BtnNeutHov),
       insertMenuOpen(false), deleteMenuOpen(false),
       msgTimer(0.0f), msgColor(Pal::BtnSuccess),
-      btnShowCode({1140, 18, 120, 34}, "Show Code", Pal::BtnNeutral, Pal::BtnNeutHov) {}
+      btnShowCode  ({1140,  18, 120, 34}, "Show Code", Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnScrollLeft({  10, 330,  44, 44}, "<",         Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnScrollRight({1226, 330,  44, 44}, ">",        Pal::BtnNeutral, Pal::BtnNeutHov) {}
 
 void LinkedListScreen::LayoutNodes() {
     int n = (int)nodes.size();
     float totalW = n * 2 * NODE_R + (n > 0 ? (n - 1) * NODE_GAP : 0);
     float startX = 640.0f - totalW / 2.0f + NODE_R;
     for (int i = 0; i < n; i++) {
-        nodes[i].tx = startX + i * (2 * NODE_R + NODE_GAP);
+        nodes[i].tx = startX + i * (2 * NODE_R + NODE_GAP) + scrollX;
         nodes[i].ty = NODE_Y;
     }
 }
@@ -163,6 +165,9 @@ Screen LinkedListScreen::Update() {
         showCode = !showCode;
         btnShowCode.label = showCode ? "Hide Code" : "Show Code";
     }
+
+    if (btnScrollLeft.Update())  { scrollX -= (2*NODE_R + NODE_GAP); LayoutNodes(); }
+    if (btnScrollRight.Update()) { scrollX += (2*NODE_R + NODE_GAP); LayoutNodes(); }
 
     if (stepActive) {
         stepTimer -= dt;
@@ -305,6 +310,9 @@ void LinkedListScreen::Draw() const {
                          NODE_Y + 5, 17.0f, Pal::TxtLight);
     }
 
+    btnScrollLeft.Draw();
+    btnScrollRight.Draw();
+
     int n = (int)nodes.size();
 
     // Arrows and hide arrows to/from new node until insert phase 2
@@ -404,9 +412,10 @@ void LinkedListScreen::Draw() const {
     if (msgTimer > 0 && !message.empty()) {
         float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
         Color c = msgColor; c.a = (unsigned char)(alpha * 220);
-        DrawTextEx(fontRegular, message.c_str(), {480, 648}, 16.0f, 1.0f, c);
+        float mw = MeasureTextEx(fontRegular, message.c_str(), 16.0f, 1.0f).x;
+        DrawTextEx(fontRegular, message.c_str(), {640.0f - mw / 2.0f, 682}, 16.0f, 1.0f, c);
     }
 
     char cnt[32]; snprintf(cnt, sizeof(cnt), "Nodes: %d", (int)nodes.size());
-    DrawTextEx(fontRegular, cnt, {1150, 640}, 14.0f, 1.0f, Pal::TxtLight);
+    DrawTextEx(fontRegular, cnt, {1150, 684}, 14.0f, 1.0f, Pal::TxtLight);
 }
