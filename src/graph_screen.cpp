@@ -994,16 +994,6 @@ void GraphScreen::Draw() const {
         DrawTextEx(fontRegular, stepBuf, {20, 664}, 13.0f, 1.0f, Pal::TxtMid);
     }
 
-    if (selectionType == GraphSelectionType::Node && selectedIndex >= 0) {
-        std::string line = "Da chon dinh: " + nodes[selectedIndex].label + "  |  Click dinh khac de them canh, click vung trong de them dinh";
-        DrawTextEx(fontRegular, line.c_str(), {20, 645}, 13.0f, 1.0f, Pal::TxtMid);
-    } else if (selectionType == GraphSelectionType::Edge && selectedIndex >= 0) {
-        DrawTextEx(fontRegular, "Da chon canh. Dung nut Delete/Edit phia duoi.", {20, 645}, 13.0f, 1.0f, Pal::TxtMid);
-    } else {
-        DrawTextEx(fontRegular, "Click vung trong de them dinh | Click dinh de chon | Chon dinh roi click dinh khac de them canh.", {20, 645}, 13.0f, 1.0f, Pal::TxtLight);
-    }
-
-    DrawTextEx(fontRegular, editDialogOpen ? "Dang mo hop thoai chinh sua. Xac nhan hoac huy." : "Click dinh hoac canh, sau do dung Edit hoac Delete.", {20, 667}, 13.0f, 1.0f, Pal::TxtLight);
 
     if (msgTimer > 0.0f && !message.empty()) {
         Color c = msgColor;
