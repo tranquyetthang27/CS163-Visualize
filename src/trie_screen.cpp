@@ -13,12 +13,13 @@ static constexpr float TRIE_DY     = 80.0f;
 static constexpr float NODE_R      = 20.0f;
 
 TrieScreen::TrieScreen()
-    : input({340, 636, 200, 40}, "Enter word...", 10),
-      btnInsert({20,  636, 120, 40}, "Insert",  Pal::BtnPrimary, Pal::BtnPrimHov),
-      btnSearch ({550, 636, 120, 40}, "Search",  Pal::BtnOrange,  Pal::BtnOrangeHov),
-      btnClear  ({155, 636, 100, 40}, "Clear",   Pal::BtnDanger,  Pal::BtnDangHov),
-      btnBack   ({20,  20,  100, 36}, "< Back",  Pal::BtnNeutral, Pal::BtnNeutHov),
-      btnLoad   ({810, 636, 120, 40}, "Load File", Pal::BtnNeutral, Pal::BtnNeutHov),
+    : btnInsert({20,  636, 80,  40}, "Insert",    Pal::BtnPrimary, Pal::BtnPrimHov),
+      btnClear  ({110, 636, 80,  40}, "Clear",     Pal::BtnDanger,  Pal::BtnDangHov),
+      input     ({200, 636, 180, 40}, "Enter word...", 10),
+      btnSearch ({390, 636, 100, 40}, "Search",    Pal::BtnOrange,  Pal::BtnOrangeHov),
+      btnToggleMode({500, 636, 140, 40}, "Mode: Step", Pal::BtnNeutral, Pal::BtnNeutHov), 
+      btnLoad   ({650, 636, 110, 40}, "Load File", Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnBack   ({20,  20,  100, 36}, "< Back",    Pal::BtnNeutral, Pal::BtnNeutHov),
       msgTimer(0), msgColor(Pal::BtnSuccess), root(0)
 {
     camera.target = (Vector2){ 640, TRIE_TOP_Y }; // Nhìn vào gốc của cây Trie
@@ -88,6 +89,18 @@ Screen TrieScreen::Update() {
         nd.x += (nd.targetX - nd.x) * 10.0f * dt;
         nd.y += (nd.targetY - nd.y) * 10.0f * dt;
     }
+
+    if (btnToggleMode.Update()) {
+    isStepByStep = !isStepByStep;
+    
+    if (isStepByStep) {
+        btnToggleMode.label = "Mode: Step";
+        btnToggleMode.baseColor = Pal::BtnNeutral; 
+    } else {
+        btnToggleMode.label = "Mode: Instant";
+        btnToggleMode.baseColor = Pal::BtnPrimary; 
+    }
+}
 
     if (isAnimating || isSearching) {
         stepTimer += dt;
@@ -160,8 +173,17 @@ Screen TrieScreen::Update() {
         for (char c : input.text) if (isalpha(c)) clean += (char)tolower(c);
         
         if (!clean.empty()) {
-            if (clickInsert) StartInsert(clean);
-            else StartSearch(clean);
+            if (isStepByStep) {
+                if (clickInsert) StartInsert(clean);
+                else StartSearch(clean);
+            } else {
+                if (clickInsert) {
+                    InstantInsert(clean); 
+                    SetMsg("Inserted (Instant)");
+                } else {
+                    InstantSearch(clean); 
+                }
+            }
         }
         input.Clear();
     }
@@ -260,8 +282,6 @@ void TrieScreen::Draw(){
     DrawTextEx(fontBold, "Trie Visualization", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
     DrawTextEx(fontRegular, "Insert words to build the tree and search prefixes", {130, 52}, 14.0f, 1.0f, Pal::TxtLight);
     
-    btnBack.Draw();
-
     DrawCircleV({820, 45}, 7, Pal::NodeFound);
     DrawTextEx(fontRegular, "= End of Word", {835, 38}, 14.0f, 1.0f, Pal::TxtMid);
 
@@ -272,13 +292,18 @@ void TrieScreen::Draw(){
     btnClear.Draw();
     input.Draw();
     btnSearch.Draw();
+    btnToggleMode.Draw();
+    btnBack.Draw();
     btnLoad.Draw();
 
     if (msgTimer > 0 && !message.empty()) {
-        float fade = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
-        Color c = msgColor; c.a = (unsigned char)(fade * 255);
-        DrawTextEx(fontRegular, message.c_str(), {700, 646}, 18.0f, 1.0f, c);
+        float fade = (msgTimer < 0.5f) ? (msgTimer / 0.5f) : 1.0f;
+        Color c = msgColor; 
+        c.a = (unsigned char)(fade * 255);
+        Vector2 msgPos = { 20, 600 }; 
+        DrawTextEx(fontRegular, message.c_str(), msgPos, 20.0f, 1.0f, c);
     }
+
 
     char cnt[32];
     snprintf(cnt, sizeof(cnt), "Total Nodes: %d", (int)pool.size());
@@ -288,18 +313,40 @@ void TrieScreen::Draw(){
 void TrieScreen::InstantInsert(const std::string& word) {
     int curr = root;
     for (char c : word) {
-        int idx = c - 'a';
-        if (idx < 0 || idx >= 26) continue;
-        
+        int idx = tolower(c) - 'a';
         if (pool[curr].children[idx] == -1) {
             int newNodeIdx = (int)pool.size();
-            pool.emplace_back(c);
+            pool.emplace_back(tolower(c));
             pool[newNodeIdx].alpha = 1.0f; 
+            pool[newNodeIdx].x = pool[curr].x;
+            pool[newNodeIdx].y = pool[curr].y;
+            
             pool[curr].children[idx] = newNodeIdx;
         }
         curr = pool[curr].children[idx];
     }
     pool[curr].isEnd = true;
+    Layout(); 
+}
+
+
+void TrieScreen::InstantSearch(const std::string& word) {
+    int curr = root;
+    highlightPath.clear();
+    highlightPath.push_back(root);
+
+    for (char c : word) {
+        int idx = tolower(c) - 'a';
+        if (pool[curr].children[idx] == -1) {
+            SetMsg("Not Found", Pal::BtnDanger);
+            return;
+        }
+        curr = pool[curr].children[idx];
+        highlightPath.push_back(curr);
+    }
+
+    if (pool[curr].isEnd) SetMsg("Found!", Pal::BtnSuccess);
+    else SetMsg("Prefix exists, but word not found", Pal::BtnOrange);
 }
 
 void TrieScreen::OnLoadFileTriggered(const std::string& path) {

@@ -50,10 +50,14 @@ public:
     void Draw();
 
 private:
+    bool isStepByStep = true; 
+    Button btnToggleMode;
+
     void DrawAllEdges(int node);
     void DrawAllNodes(int node);
     
     void InstantInsert(const std::string& word);
+    void InstantSearch(const std::string& word);
     void OnLoadFileTriggered(const std::string& path);
 
     void StartInsert(const std::string& word);
