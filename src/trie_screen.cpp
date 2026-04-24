@@ -81,6 +81,12 @@ void TrieScreen::Layout() {
 Screen TrieScreen::Update() {
     float dt = GetFrameTime();
     
+    if (!isAnimating && !isSearching && !loadQueue.empty()) {
+        std::string nextWord = loadQueue.front();
+        loadQueue.pop();
+        StartInsert(nextWord); 
+    }
+
     UpdateCameraZoom(camera); 
     UpdateCameraPan(camera);
     
@@ -351,16 +357,17 @@ void TrieScreen::InstantSearch(const std::string& word) {
 
 void TrieScreen::OnLoadFileTriggered(const std::string& path) {
     std::vector<std::string> wordList = InitFile::loadWords(path);
-    
     if (wordList.empty()) {
         SetMsg("Failed to load or file empty", Pal::BtnDanger);
         return;
     }
 
-    for (const std::string& w : wordList) {
-        InstantInsert(w);
+    if (isStepByStep) {
+        for (const std::string& w : wordList) loadQueue.push(w);
+        SetMsg("Processing file step-by-step...", Pal::BtnOrange);
+    } else {
+        for (const std::string& w : wordList) InstantInsert(w);
+        Layout();
+        SetMsg("File loaded successfully (Instant)!");
     }
-    
-    Layout(); 
-    SetMsg("File loaded successfully!");
 }

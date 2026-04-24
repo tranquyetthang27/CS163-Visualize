@@ -4,7 +4,7 @@
 #include "input_field.h"
 #include <string>
 #include <vector>
-
+#include <queue>
 struct TrieNode {
     int children[26];
     bool isEnd;
@@ -50,6 +50,7 @@ public:
     void Draw();
 
 private:
+    std::queue<std::string> loadQueue;
     bool isStepByStep = true; 
     Button btnToggleMode;
 
