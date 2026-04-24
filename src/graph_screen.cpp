@@ -913,8 +913,6 @@ void GraphScreen::Draw() const {
         DrawRectangleRounded(thumb, 0.5f, 4, Pal::BtnPrimary);
     }
 
-    DrawTextEx(fontRegular, "STT stays attached to each row while the headers remain fixed.", {892, 548}, 11.0f, 1.0f, Pal::TxtLight);
-
     DrawRectangleRec({0, 610, 1280, 110}, Pal::Panel);
     DrawLineEx({0, 610}, {1280, 610}, 1.0f, Pal::Border);
 
@@ -931,19 +929,17 @@ void GraphScreen::Draw() const {
 
     if (selectionType == GraphSelectionType::Node && selectedIndex >= 0) {
         std::string line = "Selected node: " + nodes[selectedIndex].label;
-        DrawTextEx(fontRegular, line.c_str(), {20, 645}, 13.0f, 1.0f, Pal::TxtMid);
+        DrawTextEx(fontRegular, line.c_str(), {20, 660}, 13.0f, 1.0f, Pal::TxtMid);
     } else if (selectionType == GraphSelectionType::Edge && selectedIndex >= 0) {
-        DrawTextEx(fontRegular, "Selected edge. Use Delete/Edit buttons below.", {20, 645}, 13.0f, 1.0f, Pal::TxtMid);
-    } else {
-        DrawTextEx(fontRegular, "Click a node or edge to select.", {20, 645}, 13.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontRegular, "Selected edge. Use Delete/Edit buttons below.", {20, 660}, 13.0f, 1.0f, Pal::TxtMid);
     }
 
-    DrawTextEx(fontRegular, editDialogOpen ? "Edit dialog is open. Confirm or cancel in the popup." : "Click a node or edge, then Edit or Delete.", {20, 667}, 13.0f, 1.0f, Pal::TxtLight);
+    DrawTextEx(fontRegular, editDialogOpen ? "Edit dialog is open. Confirm or cancel in the popup." : "Click a node or edge, then Edit or Delete.", {20, 683}, 13.0f, 1.0f, Pal::TxtLight);
 
     if (msgTimer > 0.0f && !message.empty()) {
         Color c = msgColor;
         c.a = static_cast<unsigned char>((msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f) * 220.0f);
-        DrawTextEx(fontRegular, message.c_str(), {20, 690}, 14.2f, 1.0f, c);
+        DrawTextEx(fontRegular, message.c_str(), {20, 702}, 14.2f, 1.0f, c);
     }
 
     if (editDialogOpen) {
