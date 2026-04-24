@@ -179,26 +179,26 @@ GraphScreen::GraphScreen()
       selectedIndex(-1),
             editTarget(GraphEditTarget::None),
             editDialogOpen(false),
-            addEdgePendingU(-1),
-            addEdgePendingV(-1),
-            addNodePendingX(0.0f),
-            addNodePendingY(0.0f),
                         draggingNodeIndex(-1),
                         draggingOffset({0.0f, 0.0f}),
             inputScrollY(0.0f),
             inputScrollDragging(false),
             inputScrollDragOffset(0.0f),
       btnBack({20, 20, 100, 36}, "< Back", Pal::BtnNeutral, Pal::BtnNeutHov),
-      btnDelete({20, 642, 190, 40}, "Delete", Pal::BtnDanger, Pal::BtnDangHov),
-      btnEdit({230, 642, 190, 40}, "Edit", Pal::BtnPrimary, Pal::BtnPrimHov),
-      btnKruskal({440, 642, 190, 40}, "Kruskal's Algorithm", Pal::BtnSuccess, Pal::BtnSuccHov),
-      btnPrim({650, 642, 190, 40}, "Prim's Algorithm", Pal::BtnPrimary, Pal::BtnPrimHov),
+    btnDelete({20, 642, 130, 40}, "Delete", Pal::BtnDanger, Pal::BtnDangHov),
+    btnChange({160, 642, 130, 40}, "Change", Pal::BtnPrimary, Pal::BtnPrimHov),
+    btnAddNode({300, 642, 130, 40}, "Add Node", Pal::BtnSuccess, Pal::BtnSuccHov),
+    btnAddEdge({440, 642, 130, 40}, "Add Edge", Pal::BtnNeutral, Pal::BtnNeutHov),
+    btnKruskal({580, 642, 130, 40}, "Kruskal", Pal::BtnSuccess, Pal::BtnSuccHov),
+    btnPrim({720, 642, 130, 40}, "Prim", Pal::BtnPrimary, Pal::BtnPrimHov),
       mstCurrentStep(0),
       mstActive(false),
       mstStepTimer(0.0f),
-            btnEditOk({360, 388, 272, 40}, "OK", Pal::BtnSuccess, Pal::BtnSuccHov),
-            btnEditCancel({648, 388, 272, 40}, "Cancel", Pal::BtnNeutral, Pal::BtnNeutHov),
-            editField({360, 328, 560, 38}, "new value", 24),
+        btnEditOk({360, 470, 272, 40}, "OK", Pal::BtnSuccess, Pal::BtnSuccHov),
+        btnEditCancel({648, 470, 272, 40}, "Cancel", Pal::BtnNeutral, Pal::BtnNeutHov),
+        editField({360, 328, 560, 38}, "value", 24),
+        editFromField({360, 410, 272, 38}, "from (node label/index)", 24),
+        editToField({648, 410, 272, 38}, "to (node label/index)", 24),
       msgTimer(0.0f),
       msgColor(Pal::TxtMid) {
     nodes[0] = {200, 200, "A", true};
@@ -260,6 +260,8 @@ void GraphScreen::ClearInputFocus() {
         }
     }
     editField.focused = false;
+    editFromField.focused = false;
+    editToField.focused = false;
 }
 
 void GraphScreen::ClearSelection() {
@@ -431,7 +433,7 @@ bool GraphScreen::ApplyInputToGraph(bool showMessage) {
     return true;
 }
 
-void GraphScreen::OpenEditDialog() {
+void GraphScreen::OpenChangeDialog() {
     if (selectionType == GraphSelectionType::None || selectedIndex < 0) {
         SetMsg("Click a node or edge first.", Pal::BtnDanger, 2.5f);
         return;
@@ -449,6 +451,32 @@ void GraphScreen::OpenEditDialog() {
     }
 }
 
+void GraphScreen::OpenAddNodeDialog() {
+    if (nodeCount >= MAX_GRAPH_N) {
+        SetMsg("Maximum 26 nodes reached.", Pal::BtnDanger, 2.5f);
+        return;
+    }
+    editDialogOpen = true;
+    editTarget = GraphEditTarget::AddNodeLabel;
+    ClearInputFocus();
+    editField.Clear();
+    editField.focused = true;
+}
+
+void GraphScreen::OpenAddEdgeDialog() {
+    if (nodeCount < 2) {
+        SetMsg("Need at least 2 nodes to add an edge.", Pal::BtnDanger, 2.5f);
+        return;
+    }
+    editDialogOpen = true;
+    editTarget = GraphEditTarget::AddEdge;
+    ClearInputFocus();
+    editField.Clear();
+    editFromField.Clear();
+    editToField.Clear();
+    editField.focused = true;
+}
+
 void GraphScreen::ApplySelectedEdit() {
     if (!editDialogOpen) return;
 
@@ -457,22 +485,47 @@ void GraphScreen::ApplySelectedEdit() {
             SetMsg("Node label cannot be empty.", Pal::BtnDanger, 2.5f);
             return;
         }
-        AddNodeAt(addNodePendingX, addNodePendingY, editField.text);
+        AddNodeAtRandom(editField.text);
         editDialogOpen = false;
         editTarget = GraphEditTarget::None;
         ClearInputFocus();
         return;
     }
 
-    if (editTarget == GraphEditTarget::AddEdgeWeight) {
+    if (editTarget == GraphEditTarget::AddEdge) {
+        int u = -1;
+        int v = -1;
         int weight = 0;
         if (!ParseIntStrict(editField.text, &weight) || weight <= 0) {
             SetMsg("Edge weight must be a positive number.", Pal::BtnDanger, 2.5f);
             return;
         }
-        edges.push_back({addEdgePendingU, addEdgePendingV, weight, true});
-        addEdgePendingU = -1;
-        addEdgePendingV = -1;
+        if (!ParseNodeRef(editFromField.text, indexBase, nodes, nodeCount, &u) ||
+            !ParseNodeRef(editToField.text, indexBase, nodes, nodeCount, &v)) {
+            SetMsg("From/To must be valid node labels or indices.", Pal::BtnDanger, 2.5f);
+            return;
+        }
+        if (u == v) {
+            SetMsg("From and To must be different nodes.", Pal::BtnDanger, 2.5f);
+            return;
+        }
+
+        for (auto& edge : edges) {
+            if (!edge.visible) {
+                continue;
+            }
+            if ((edge.u == u && edge.v == v) || (edge.u == v && edge.v == u)) {
+                edge.w = weight;
+                editDialogOpen = false;
+                editTarget = GraphEditTarget::None;
+                ClearInputFocus();
+                SyncFieldsFromGraph(false);
+                SetMsg("Edge exists: weight updated.", Pal::BtnSuccess, 2.0f);
+                return;
+            }
+        }
+
+        edges.push_back({u, v, weight, true});
         editDialogOpen = false;
         editTarget = GraphEditTarget::None;
         ClearInputFocus();
@@ -559,7 +612,7 @@ void GraphScreen::SetMsg(const char* msg, Color c, float dur) {
     msgTimer = dur;
 }
 
-void GraphScreen::AddNodeAt(float x, float y, const std::string& label) {
+void GraphScreen::AddNodeAtRandom(const std::string& label) {
     if (nodeCount >= MAX_GRAPH_N) {
         SetMsg("Maximum 26 nodes reached.", Pal::BtnDanger, 2.5f);
         return;
@@ -568,8 +621,34 @@ void GraphScreen::AddNodeAt(float x, float y, const std::string& label) {
     float maxX = 860.0f - kNodeRadius - 8.0f;
     float minY = 72.0f + kNodeRadius + 8.0f;
     float maxY = 610.0f - kNodeRadius - 8.0f;
-    x = std::max(minX, std::min(maxX, x));
-    y = std::max(minY, std::min(maxY, y));
+    auto rand01 = []() -> float {
+        return static_cast<float>(GetRandomValue(0, 10000)) / 10000.0f;
+    };
+
+    float x = minX + rand01() * (maxX - minX);
+    float y = minY + rand01() * (maxY - minY);
+    float minDist = kNodeRadius * 2.0f + 10.0f;
+    float minDist2 = minDist * minDist;
+
+    for (int attempt = 0; attempt < 32; ++attempt) {
+        bool overlap = false;
+        for (int i = 0; i < nodeCount; i++) {
+            if (!nodes[i].visible) {
+                continue;
+            }
+            float dx = nodes[i].x - x;
+            float dy = nodes[i].y - y;
+            if (dx * dx + dy * dy < minDist2) {
+                overlap = true;
+                break;
+            }
+        }
+        if (!overlap) {
+            break;
+        }
+        x = minX + rand01() * (maxX - minX);
+        y = minY + rand01() * (maxY - minY);
+    }
 
     nodes[nodeCount] = {x, y, label, true};
     nodeCount++;
@@ -708,20 +787,10 @@ Screen GraphScreen::Update() {
             }
 
             if (hitNode >= 0) {
-                // If a node is already selected, add an edge between them
-                if (selectionType == GraphSelectionType::Node && selectedIndex >= 0 && selectedIndex != hitNode) {
-                    addEdgePendingU = selectedIndex;
-                    addEdgePendingV = hitNode;
-                    editTarget = GraphEditTarget::AddEdgeWeight;
-                    editDialogOpen = true;
-                    editField.focused = true;
-                    editField.Clear();
-                } else {
-                    selectionType = GraphSelectionType::Node;
-                    selectedIndex = hitNode;
-                    draggingNodeIndex = hitNode;
-                    draggingOffset = {nodes[hitNode].x - mouse.x, nodes[hitNode].y - mouse.y};
-                }
+                selectionType = GraphSelectionType::Node;
+                selectedIndex = hitNode;
+                draggingNodeIndex = hitNode;
+                draggingOffset = {nodes[hitNode].x - mouse.x, nodes[hitNode].y - mouse.y};
             } else {
                 int hitEdge = -1;
                 for (int i = 0; i < static_cast<int>(edges.size()); i++) {
@@ -742,19 +811,8 @@ Screen GraphScreen::Update() {
                     selectedIndex = hitEdge;
                     draggingNodeIndex = -1;
                 } else {
-                    // Click on empty canvas: prompt for node label
                     ClearSelection();
                     draggingNodeIndex = -1;
-                    if (nodeCount < MAX_GRAPH_N) {
-                        addNodePendingX = mouse.x;
-                        addNodePendingY = mouse.y;
-                        editTarget = GraphEditTarget::AddNodeLabel;
-                        editDialogOpen = true;
-                        editField.focused = true;
-                        editField.Clear();
-                    } else {
-                        SetMsg("Maximum 26 nodes reached.", Pal::BtnDanger, 2.5f);
-                    }
                 }
             }
         }
@@ -782,11 +840,37 @@ Screen GraphScreen::Update() {
         if (btnDelete.Update()) {
             DeleteSelected();
         }
-        if (btnEdit.Update()) {
-            OpenEditDialog();
+        if (btnChange.Update()) {
+            OpenChangeDialog();
+        }
+        if (btnAddNode.Update()) {
+            OpenAddNodeDialog();
+        }
+        if (btnAddEdge.Update()) {
+            OpenAddEdgeDialog();
         }
     } else {
-        editField.UpdateFocused();
+        if (editTarget == GraphEditTarget::AddEdge && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            Vector2 mouse = GetMousePosition();
+            bool hitWeight = CheckCollisionPointRec(mouse, editField.rect);
+            bool hitFrom = CheckCollisionPointRec(mouse, editFromField.rect);
+            bool hitTo = CheckCollisionPointRec(mouse, editToField.rect);
+            editField.focused = hitWeight;
+            editFromField.focused = hitFrom;
+            editToField.focused = hitTo;
+        }
+
+        if (editField.focused) {
+            editField.UpdateFocused();
+        }
+        if (editTarget == GraphEditTarget::AddEdge) {
+            if (editFromField.focused) {
+                editFromField.UpdateFocused();
+            }
+            if (editToField.focused) {
+                editToField.UpdateFocused();
+            }
+        }
         if (btnEditOk.Update() || IsKeyPressed(KEY_ENTER)) {
             ApplySelectedEdit();
         }
@@ -908,8 +992,7 @@ void GraphScreen::Draw() const {
         }
 
         bool selected = selectionType == GraphSelectionType::Node && selectedIndex == i;
-        // Highlight addEdgePendingU node while dialog is open
-        bool isPending = editTarget == GraphEditTarget::AddEdgeWeight && selectedIndex == i;
+        bool isPending = false;
         Color border = (selected || isPending) ? Pal::NodeHL : Pal::NodeBorder;
         DrawCircleV({nd.x, nd.y}, kNodeRadius + 2.0f, border);
         DrawCircleV({nd.x, nd.y}, kNodeRadius, Pal::NodeFill);
@@ -994,7 +1077,9 @@ void GraphScreen::Draw() const {
     DrawLineEx({0, 610}, {1280, 610}, 1.0f, Pal::Border);
 
     btnDelete.Draw();
-    btnEdit.Draw();
+    btnChange.Draw();
+    btnAddNode.Draw();
+    btnAddEdge.Draw();
     btnKruskal.Draw();
     btnPrim.Draw();
 
@@ -1013,20 +1098,31 @@ void GraphScreen::Draw() const {
 
     if (editDialogOpen) {
         DrawRectangleRec({0, 0, 1280, 720}, {20, 28, 48, 110});
-        DrawRectangleRounded({330, 240, 620, 210}, 0.08f, 10, Pal::Surface);
-        DrawRectangleRoundedLines({330, 240, 620, 210}, 0.08f, 10, Pal::Border);
+        DrawRectangleRounded({300, 200, 680, 330}, 0.08f, 10, Pal::Surface);
+        DrawRectangleRoundedLines({300, 200, 680, 330}, 0.08f, 10, Pal::Border);
 
         const char* dlgTitle = (editTarget == GraphEditTarget::NodeLabel)    ? "Edit Node"
                              : (editTarget == GraphEditTarget::AddNodeLabel)  ? "Add Node"
-                             : (editTarget == GraphEditTarget::AddEdgeWeight) ? "Add Edge" : "Edit Edge";
+                             : (editTarget == GraphEditTarget::AddEdge) ? "Add Edge" : "Edit Edge";
         const char* dlgHint  = (editTarget == GraphEditTarget::NodeLabel)    ? "Enter a new node label and confirm."
                              : (editTarget == GraphEditTarget::AddNodeLabel)  ? "Enter a label for the new node."
-                             : (editTarget == GraphEditTarget::AddEdgeWeight) ? "Enter edge weight (positive integer)."
+                             : (editTarget == GraphEditTarget::AddEdge) ? "Enter weight and both endpoints (From, To)."
                              : "Enter a new edge weight and confirm.";
         DrawTextEx(fontBold, dlgTitle, {360, 258}, 22.0f, 1.0f, Pal::TxtDark);
         DrawTextEx(fontRegular, dlgHint, {360, 284}, 13.0f, 1.0f, Pal::TxtLight);
-        DrawLineEx({360, 374}, {920, 374}, 1.0f, Pal::Border);
+        DrawLineEx({360, 448}, {920, 448}, 1.0f, Pal::Border);
+
+        if (editTarget == GraphEditTarget::AddEdge) {
+            DrawTextEx(fontRegular, "Weight", {360, 312}, 12.0f, 1.0f, Pal::TxtMid);
+            DrawTextEx(fontRegular, "From", {360, 394}, 12.0f, 1.0f, Pal::TxtMid);
+            DrawTextEx(fontRegular, "To", {648, 394}, 12.0f, 1.0f, Pal::TxtMid);
+        }
+
         editField.Draw();
+        if (editTarget == GraphEditTarget::AddEdge) {
+            editFromField.Draw();
+            editToField.Draw();
+        }
         btnEditOk.Draw();
         btnEditCancel.Draw();
     }
