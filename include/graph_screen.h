@@ -39,7 +39,7 @@ enum class GraphEditTarget {
     None,
     NodeLabel,
     EdgeWeight,
-    AddEdgeWeight,
+    AddEdge,
     AddNodeLabel
 };
 
@@ -59,10 +59,6 @@ class GraphScreen {
 
     GraphEditTarget editTarget;
     bool editDialogOpen;
-    int addEdgePendingU;
-    int addEdgePendingV;
-    float addNodePendingX;
-    float addNodePendingY;
 
     int draggingNodeIndex;
     Vector2 draggingOffset;
@@ -73,7 +69,9 @@ class GraphScreen {
 
     Button btnBack;
     Button btnDelete;
-    Button btnEdit;
+    Button btnChange;
+    Button btnAddNode;
+    Button btnAddEdge;
     Button btnEditOk;
     Button btnEditCancel;
     Button btnKruskal;
@@ -89,6 +87,8 @@ class GraphScreen {
     InputField matrixFields[MAX_GRAPH_N][MAX_GRAPH_N];
     InputField adjListFields[MAX_GRAPH_N];
     InputField editField;
+    InputField editFromField;
+    InputField editToField;
 
     std::string message;
     float msgTimer;
@@ -100,10 +100,12 @@ class GraphScreen {
     void SetIndexBase(int base);
     void SyncFieldsFromGraph(bool clearFocus = true);
     bool ApplyInputToGraph(bool showMessage);
-    void OpenEditDialog();
+    void OpenChangeDialog();
+    void OpenAddNodeDialog();
+    void OpenAddEdgeDialog();
     void ApplySelectedEdit();
     void DeleteSelected();
-    void AddNodeAt(float x, float y, const std::string& label);
+    void AddNodeAtRandom(const std::string& label);
     float GetInputContentHeight() const;
     float GetInputMaxScroll() const;
     void ClampInputScroll();
