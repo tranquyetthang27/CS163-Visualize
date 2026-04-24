@@ -19,6 +19,12 @@ struct GEdge {
     bool highlighted;
 };
 
+struct MSTStep {
+    int edgeIdx;
+    bool added;
+    int cumulativeWeight;
+};
+
 enum class GraphInputMode {
     EdgeList,
     AdjacencyMatrix,
@@ -65,6 +71,10 @@ class GraphScreen {
     Button btnEditCancel;
     Button btnKruskal;
     Button btnPrim;
+    std::vector<MSTStep> mstSteps;
+    int mstCurrentStep;
+    bool mstActive;
+    float mstStepTimer;
 
     InputField edgeFromFields[GRAPH_E];
     InputField edgeToFields[GRAPH_E];
