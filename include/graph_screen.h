@@ -38,15 +38,17 @@ enum class GraphSelectionType {
 enum class GraphEditTarget {
     None,
     NodeLabel,
-    EdgeWeight
+    EdgeWeight,
+    AddEdgeWeight
 };
 
 class GraphScreen {
-    static constexpr int GRAPH_N = 7;
-    static constexpr int GRAPH_E = 11;
+    static constexpr int MAX_GRAPH_N = 26;
+    static constexpr int MAX_GRAPH_E = 50;
 
-    GNode nodes[GRAPH_N];
+    GNode nodes[MAX_GRAPH_N];
     std::vector<GEdge> edges;
+    int nodeCount;
 
     GraphInputMode inputMode;
     int indexBase;
@@ -56,6 +58,8 @@ class GraphScreen {
 
     GraphEditTarget editTarget;
     bool editDialogOpen;
+    int addEdgePendingU;
+    int addEdgePendingV;
 
     int draggingNodeIndex;
     Vector2 draggingOffset;
@@ -76,11 +80,11 @@ class GraphScreen {
     bool mstActive;
     float mstStepTimer;
 
-    InputField edgeFromFields[GRAPH_E];
-    InputField edgeToFields[GRAPH_E];
-    InputField edgeWeightFields[GRAPH_E];
-    InputField matrixFields[GRAPH_N][GRAPH_N];
-    InputField adjListFields[GRAPH_N];
+    InputField edgeFromFields[MAX_GRAPH_E];
+    InputField edgeToFields[MAX_GRAPH_E];
+    InputField edgeWeightFields[MAX_GRAPH_E];
+    InputField matrixFields[MAX_GRAPH_N][MAX_GRAPH_N];
+    InputField adjListFields[MAX_GRAPH_N];
     InputField editField;
 
     std::string message;
@@ -96,11 +100,12 @@ class GraphScreen {
     void OpenEditDialog();
     void ApplySelectedEdit();
     void DeleteSelected();
+    void AddNodeAt(float x, float y);
     float GetInputContentHeight() const;
     float GetInputMaxScroll() const;
     void ClampInputScroll();
-    void SetMsg(const char* msg, 
-                Color c = {46, 160, 67, 255}, 
+    void SetMsg(const char* msg,
+                Color c = {46, 160, 67, 255},
                 float dur = 3.0f);
     void RunKruskal();
     void RunPrim();
