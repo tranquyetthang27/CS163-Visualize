@@ -1,4 +1,5 @@
 #include "linked_list_screen.h"
+#include "init_file.h"
 #include "font.h"
 #include "colors.h"
 #include <cstring>
@@ -23,6 +24,7 @@ LinkedListScreen::LinkedListScreen()
       btnSearch ({655, 630, 120, 40}, "Search",      Pal::BtnOrange,  Pal::BtnOrangeHov),
       btnUpdate ({805, 630, 120, 40}, "Update",      Pal::Teal,       Pal::TealDark),
       btnBack   ({20,  20,  100, 36}, "< Back",      Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnLoadFile({955, 630, 110, 40}, "Load File",  Pal::BtnNeutral, Pal::BtnNeutHov),
       insertMenuOpen(false), deleteMenuOpen(false),
       msgTimer(0.0f), msgColor(Pal::BtnSuccess),
       btnShowCode  ({1140,  18, 120, 34}, "Show Code", Pal::BtnNeutral, Pal::BtnNeutHov),
@@ -147,6 +149,25 @@ void LinkedListScreen::AdvanceStep() {
     }
 }
 
+void LinkedListScreen::OnLoadFileTriggered(const std::string& path) {
+    std::vector<int> nums = InitFile::loadNumbers(path);
+    if (nums.empty()) {
+        SetMsg("Failed to load or file empty!", Pal::BtnDanger);
+        return;
+    }
+    nodes.clear();
+    for (int v : nums) {
+        LLNode nd;
+        nd.value = v; nd.alpha = 1.0f; nd.state = LLState::Normal;
+        nd.x = nd.tx = 640.0f; nd.y = nd.ty = NODE_Y;
+        nodes.push_back(nd);
+    }
+    LayoutNodes();
+    for (auto& nd : nodes) { nd.x = nd.tx; nd.y = nd.ty; }
+    char buf[64]; snprintf(buf, sizeof(buf), "Loaded %d nodes from file.", (int)nodes.size());
+    SetMsg(buf, Pal::BtnSuccess, 3.0f);
+}
+
 //Update
 
 Screen LinkedListScreen::Update() {
@@ -204,6 +225,11 @@ Screen LinkedListScreen::Update() {
 
     bool doSearch = btnSearch.Update();
     bool doUpdate = btnUpdate.Update();
+
+    if (btnLoadFile.Update()) {
+        std::string fullPath = std::string(PROJECT_ROOT_PATH) + "data.txt";
+        OnLoadFileTriggered(fullPath);
+    }
 
     auto parseVal = [&](int& out) -> bool {
         if (input.IsEmpty()) { SetMsg("Enter a value!", {229,57,53,255}); return false; }
@@ -408,6 +434,7 @@ void LinkedListScreen::Draw() const {
     }
     btnSearch.Draw();
     btnUpdate.Draw();
+    btnLoadFile.Draw();
 
     if (msgTimer > 0 && !message.empty()) {
         float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;

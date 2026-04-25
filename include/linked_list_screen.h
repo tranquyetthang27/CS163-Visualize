@@ -23,7 +23,7 @@ class LinkedListScreen {
     InputField input;
     Button btnInsert, btnInsHead, btnInsTail, btnInsIdx;
     Button btnDel,    btnDelHead, btnDelTail, btnDelIdx;
-    Button btnSearch, btnUpdate, btnBack;
+    Button btnSearch, btnUpdate, btnBack, btnLoadFile;
     bool   insertMenuOpen;
     bool   deleteMenuOpen;
 
@@ -49,6 +49,7 @@ class LinkedListScreen {
     void StartInsertStep(int idx, int v);
     void StartDeleteStep(int idx);
     void AdvanceStep();
+    void OnLoadFileTriggered(const std::string& path);
 
 public:
     LinkedListScreen();
