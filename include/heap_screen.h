@@ -43,6 +43,9 @@ class HeapScreen {
     void SetMsg(const char* msg, Color c = {46,160,67,255}, float dur = 2.5f);
     void GetNodePos(int i, float& x, float& y) const;
 
+    void InstantInsert();
+    void InstantDel();
+
 public:
     HeapScreen();
     Screen Update();

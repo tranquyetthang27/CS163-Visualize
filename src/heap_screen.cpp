@@ -21,6 +21,37 @@ HeapScreen::HeapScreen()
       animA(-1), animB(-1), animC(-1), idCurrent(0), stepTimer(0), doingInsert(false), doingDelete(false), isHighlight(false), isStepByStep(true)
 {}
 
+void HeapScreen::InstantInsert(){
+    int n = (int)heap.size() - 1;
+    while(n && heap[n] > heap[(n - 1) / 2]){
+        std::swap(heap[n], heap[(n - 1) / 2]);
+        n = (n - 1) / 2;
+    }
+    ComputePositions();
+}
+
+void HeapScreen::InstantDel(){
+    heap[0] = heap.back();
+    heap.pop_back();
+    int n = (int)heap.size();
+    int id = 0;
+    while(true){
+        int largest = id;
+        int l = 2 * id + 1;
+        int r = 2 * id + 2;
+        if(l < n && heap[l] > heap[largest])largest = l;
+        if(r < n && heap[r] > heap[largest])largest = r;
+        if(largest == id){
+            ComputePositions();
+            break;
+        }
+        else{
+            std::swap(heap[id], heap[largest]);
+            id = largest;
+        }
+    }
+}
+
 void HeapScreen::GetNodePos(int i, float& x, float& y) const {
     int level = 0, tmp = i + 1;
     while (tmp > 1) { tmp >>= 1; level++; }
@@ -160,23 +191,33 @@ Screen HeapScreen::Update() {
             SetMsg("Heap full (max 15)!", Pal::BtnDanger);
         } else {
             heap.push_back(v);
-            // Heapify up
-            idCurrent = (int)heap.size() - 1;
-            isHighlight = false;
-            doingInsert = true;
-            ComputePositions();
+            if(isStepByStep){
+                // Heapify up
+                idCurrent = (int)heap.size() - 1;
+                isHighlight = false;
+                doingInsert = true;
+                ComputePositions();
+            }
+            else{
+                InstantInsert();
+            }
             input.Clear();
         }
     } else if (doDelMax && !heap.empty() ) {
-        int maxVal = heap[0];
-        heap[0] = heap.back();
-        std::swap(vis[0], vis[(int)heap.size() - 1]);
-        heap.pop_back();
-        // Heapify down
-        isHighlight = false;
-        idCurrent = 0;   
-        doingDelete = true;
-        ComputePositions();
+        if(isStepByStep){
+            int maxVal = heap[0];
+            heap[0] = heap.back();
+            std::swap(vis[0], vis[(int)heap.size() - 1]);
+            heap.pop_back();
+            // Heapify down
+            isHighlight = false;
+            idCurrent = 0;   
+            doingDelete = true;
+            ComputePositions();
+        }
+        else{
+            InstantDel();
+        }
     }
 
     return Screen::Heap;
