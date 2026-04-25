@@ -29,8 +29,9 @@ LinkedListScreen::LinkedListScreen()
       insertMenuOpen(false), deleteMenuOpen(false),
       msgTimer(0.0f), msgColor(Pal::BtnSuccess),
       btnShowCode  ({1140,  18, 120, 34}, "Show Code", Pal::BtnNeutral, Pal::BtnNeutHov),
-      btnScrollLeft ({  10, 330,  44, 44}, "<",         Pal::BtnNeutral, Pal::BtnNeutHov),
-      btnScrollRight({1226, 330,  44, 44}, ">",        Pal::BtnNeutral, Pal::BtnNeutHov) {}
+      btnScrollLeft ({  10, 330,  44, 44}, "<",          Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnScrollRight({1226, 330,  44, 44}, ">",         Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnMode       ({  20, 630, 140, 40}, "Mode: Step",Pal::BtnNeutral, Pal::BtnNeutHov) {}
 
 void LinkedListScreen::Reset() {
     nodes.clear();
@@ -40,6 +41,7 @@ void LinkedListScreen::Reset() {
     scrollX = 0.0f;
     stepOp = StepOp::None; stepActive = false;
     stepPhase = 0; stepTimer = 0.0f; stepIdx = -1;
+    isStepByStep = true; btnMode.label = "Mode: Step"; btnMode.baseColor = Pal::BtnNeutral;
     input.Clear();
     dialogPending.store(false);
     dialogResult.clear();
@@ -59,7 +61,32 @@ void LinkedListScreen::SetMsg(const char* msg, Color c, float dur) {
     message = msg; msgColor = c; msgTimer = dur;
 }
 
-//nsert step
+// Instant (no animation)
+
+void LinkedListScreen::InstantInsert(int idx, int v) {
+    LLNode nd;
+    nd.value = v; nd.alpha = 1.0f; nd.state = LLState::Normal;
+    nd.x = nd.tx = nodes.empty() ? 640.0f : (idx == 0 ? nodes[0].tx : nodes[idx-1].tx);
+    nd.y = nd.ty = NODE_Y;
+    nodes.insert(nodes.begin() + idx, nd);
+    LayoutNodes();
+    for (auto& n : nodes) { n.x = n.tx; n.y = n.ty; }
+    char buf[64]; snprintf(buf, sizeof(buf), "Inserted %d at index %d (Instant).", v, idx);
+    SetMsg(buf, Pal::BtnSuccess, 3.0f);
+    input.Clear();
+}
+
+void LinkedListScreen::InstantDelete(int idx) {
+    int val = nodes[idx].value;
+    nodes.erase(nodes.begin() + idx);
+    LayoutNodes();
+    for (auto& n : nodes) { n.x = n.tx; n.y = n.ty; }
+    char buf[64]; snprintf(buf, sizeof(buf), "Deleted %d at index %d (Instant).", val, idx);
+    SetMsg(buf, Pal::BtnDanger, 3.0f);
+    input.Clear();
+}
+
+// Step-by-step insert
 
 void LinkedListScreen::StartInsertStep(int idx, int v) {
     LLNode nd;
@@ -109,16 +136,20 @@ void LinkedListScreen::AdvanceStep() {
 
         for (auto& n : nodes) n.state = LLState::Normal;
         switch (stepPhase) {
-            case 1:
-                nodes[stepIdx - 1].state = LLState::Highlighted;
+            case 1: // predecessor only (orange)
+                nodes[stepIdx - 1].state = LLState::Predecessor;
                 stepTimer = 0.7f; break;
-            case 2:
-                stepTimer = 0.7f; break; // arrows appear
-            case 3:
+            case 2: // arrows appear + new node (green); predecessor stays orange
+                if (stepIdx > 0) nodes[stepIdx - 1].state = LLState::Predecessor;
                 nodes[stepIdx].state = LLState::Highlighted;
                 stepTimer = 0.7f; break;
+            case 3: // successor appears (blue); others stay
+                if (stepIdx > 0) nodes[stepIdx - 1].state = LLState::Predecessor;
+                nodes[stepIdx].state = LLState::Highlighted;
+                if (stepIdx + 1 < (int)nodes.size())
+                    nodes[stepIdx + 1].state = LLState::Successor;
+                stepTimer = 0.7f; break;
             default:
-                nodes[stepIdx].state = LLState::Normal;
                 stepActive = false; stepOp = StepOp::None;
                 char buf[64];
                 snprintf(buf, sizeof(buf), "Inserted %d at index %d.", nodes[stepIdx].value, stepIdx);
@@ -144,14 +175,19 @@ void LinkedListScreen::AdvanceStep() {
             stepTimer = 0.7f;
 
         } else if (stepPhase == stepIdx + 1) {
-            // Remove node, then color predecessor (orange) and successor (green)
-            int pred = stepIdx - 1;
+            // Erase node, show predecessor (orange) only
             nodes.erase(nodes.begin() + stepIdx);
             LayoutNodes();
-            if (pred >= 0)
-                nodes[pred].state = LLState::Predecessor;
+            if (stepIdx - 1 >= 0)
+                nodes[stepIdx - 1].state = LLState::Predecessor;
+            stepTimer = 0.7f;
+
+        } else if (stepPhase == stepIdx + 2) {
+            // Keep predecessor (orange), reveal successor (blue)
+            if (stepIdx - 1 >= 0)
+                nodes[stepIdx - 1].state = LLState::Predecessor;
             if (stepIdx < (int)nodes.size())
-                nodes[stepIdx].state = LLState::Highlighted;
+                nodes[stepIdx].state = LLState::Successor;
             stepTimer = 0.7f;
 
         } else {
@@ -204,6 +240,17 @@ Screen LinkedListScreen::Update() {
 
     if (btnScrollLeft.Update())  { scrollX -= (2*NODE_R + NODE_GAP); LayoutNodes(); }
     if (btnScrollRight.Update()) { scrollX += (2*NODE_R + NODE_GAP); LayoutNodes(); }
+
+    if (btnMode.Update()) {
+        isStepByStep = !isStepByStep;
+        if (isStepByStep) {
+            btnMode.label = "Mode: Step";
+            btnMode.baseColor = Pal::BtnNeutral;
+        } else {
+            btnMode.label = "Mode: Instant";
+            btnMode.baseColor = Pal::BtnPrimary;
+        }
+    }
 
     if (stepActive) {
         stepTimer -= dt;
@@ -281,11 +328,11 @@ Screen LinkedListScreen::Update() {
     // Insert
     if (insHead) {
         int v; if (parseVal(v)) {
-            StartInsertStep(0, v);
+            if (isStepByStep) StartInsertStep(0, v); else InstantInsert(0, v);
         }
     } else if (insTail) {
         int v; if (parseVal(v)) {
-            StartInsertStep((int)nodes.size(), v);
+            if (isStepByStep) StartInsertStep((int)nodes.size(), v); else InstantInsert((int)nodes.size(), v);
         }
     } else if (insIdx) {
         if (input.IsEmpty()) { SetMsg("Format: 'index value'  e.g. '1 50'", {229,57,53,255}); }
@@ -296,16 +343,18 @@ Screen LinkedListScreen::Update() {
             else if (idx < 0 || idx > (int)nodes.size()) {
                 char buf[64]; snprintf(buf, sizeof(buf), "Index out of range (0-%d)!", (int)nodes.size());
                 SetMsg(buf, {229,57,53,255});
-            } else StartInsertStep(idx, v);
+            } else {
+                if (isStepByStep) StartInsertStep(idx, v); else InstantInsert(idx, v);
+            }
         }
     }
     // Delete
     else if (delHead) {
         if (nodes.empty()) SetMsg("List is empty!", {229,57,53,255});
-        else StartDeleteStep(0);
+        else { if (isStepByStep) StartDeleteStep(0); else InstantDelete(0); }
     } else if (delTail) {
         if (nodes.empty()) SetMsg("List is empty!", {229,57,53,255});
-        else StartDeleteStep((int)nodes.size() - 1);
+        else { if (isStepByStep) StartDeleteStep((int)nodes.size()-1); else InstantDelete((int)nodes.size()-1); }
     } else if (delIdx) {
         if (input.IsEmpty()) { SetMsg("Enter index to delete!", {229,57,53,255}); }
         else {
@@ -317,7 +366,9 @@ Screen LinkedListScreen::Update() {
             else if (idx < 0 || idx >= (int)nodes.size()) {
                 char buf[64]; snprintf(buf, sizeof(buf), "Index out of range (0-%d)!", (int)nodes.size()-1);
                 SetMsg(buf, {229,57,53,255});
-            } else StartDeleteStep(idx);
+            } else {
+                if (isStepByStep) StartDeleteStep(idx); else InstantDelete(idx);
+            }
         }
     }
     // Search
@@ -381,10 +432,11 @@ void LinkedListScreen::Draw() const {
 
     int n = (int)nodes.size();
 
-    // Arrows and hide arrows to/from new node until insert phase 2
+    // Arrows: hide arrow from new node to successor until phase 3; hide both arrows until phase 2
     for (int i = 0; i < n - 1; i++) {
-        if (stepActive && stepOp == StepOp::Insert && stepPhase < 2) {
-            if (i == stepIdx || i + 1 == stepIdx) continue;
+        if (stepActive && stepOp == StepOp::Insert) {
+            if (stepPhase < 2 && (i == stepIdx || i + 1 == stepIdx)) continue;
+            if (stepPhase == 2 && i == stepIdx) continue; // hide new->successor until phase 3
         }
         float ax = nodes[i].x + NODE_R, ay = nodes[i].y;
         float bx = nodes[i+1].x - NODE_R;
@@ -404,6 +456,8 @@ void LinkedListScreen::Draw() const {
                 fillC = {239, 83, 80, 255}; bordC = {198, 40, 40, 255}; textC = WHITE; break;
             case LLState::Predecessor:
                 fillC = {255, 204, 128, 255}; bordC = {245, 124, 0, 255}; textC = Pal::TxtDark; break;
+            case LLState::Successor:
+                fillC = {100, 181, 246, 255}; bordC = {25, 118, 210, 255}; textC = WHITE; break;
             default: break;
         }
         unsigned char a = (unsigned char)(nd.alpha * 255);
@@ -418,29 +472,51 @@ void LinkedListScreen::Draw() const {
 
     // Code panel
     if (showCode) {
-        const char* codeLines[] = {
-            "node* newNode = new node(val);",
-            "node* cur = head;",
-            "for (int i = 0; i < idx; i++)",
-            "    cur = cur->next;",
-            "newNode->next = cur->next;",
-            "cur->next = newNode;"
-        };
-        constexpr int NUM_LINES = 6;
-
-        // Which lines to highlight per phase
-        bool hl[NUM_LINES] = {};
-        switch (stepPhase) {
-            case 0: hl[0] = true; break;
-            case 1: hl[1] = hl[2] = hl[3] = true; break;
-            case 2: hl[4] = hl[5] = true; break;
-            case 3: for (auto& h : hl) h = true; break;
-        }
-
         constexpr float PX = 878, PY = 86;
         constexpr float PW = 385, LH = 22;
-        float PH = 14 + NUM_LINES * LH + 8;
 
+        const char* codeLines[7] = {};
+        bool hl[7] = {};
+        int NUM_LINES = 6;
+
+        if (stepOp == StepOp::Delete) {
+            // Delete code
+            codeLines[0] = "node* cur = head;";
+            codeLines[1] = "for (int i = 0; i < idx-1; i++)";
+            codeLines[2] = "    cur = cur->next;";
+            codeLines[3] = "node* del = cur->next;";
+            codeLines[4] = "cur->next = del->next;";
+            codeLines[5] = "delete del;";
+            NUM_LINES = 6;
+
+            if (stepPhase < stepIdx) {          // traversal
+                hl[0] = hl[1] = hl[2] = true;
+            } else if (stepPhase == stepIdx) {  // found target
+                hl[3] = true;
+            } else if (stepPhase == stepIdx + 1) { // relink
+                hl[4] = true;
+            } else if (stepPhase == stepIdx + 2) { // free
+                hl[5] = true;
+            }
+        } else {
+            // Insert code
+            codeLines[0] = "node* newNode = new node(val);";
+            codeLines[1] = "node* cur = head;";
+            codeLines[2] = "for (int i = 0; i < idx; i++)";
+            codeLines[3] = "    cur = cur->next;";
+            codeLines[4] = "newNode->next = cur->next;";
+            codeLines[5] = "cur->next = newNode;";
+            NUM_LINES = 6;
+
+            switch (stepPhase) {
+                case 0: hl[0] = true; break;
+                case 1: hl[1] = hl[2] = hl[3] = true; break;
+                case 2: hl[4] = true; break;
+                case 3: hl[5] = true; break;
+            }
+        }
+
+        float PH = 14 + NUM_LINES * LH + 8;
         DrawRectangleRounded({PX, PY, PW, PH}, 0.1f, 8, {28, 35, 51, 235});
         DrawRectangleRoundedLines({PX, PY, PW, PH}, 0.1f, 8, {63, 81, 181, 200});
 
@@ -475,6 +551,7 @@ void LinkedListScreen::Draw() const {
     btnSearch.Draw();
     btnUpdate.Draw();
     btnLoadFile.Draw();
+    btnMode.Draw();
 
     if (msgTimer > 0 && !message.empty()) {
         float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;

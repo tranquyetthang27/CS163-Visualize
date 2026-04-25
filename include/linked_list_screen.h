@@ -8,7 +8,7 @@
 #include <atomic>
 #include <mutex>
 
-enum class LLState { Normal, Highlighted, Found, Removing, Predecessor };
+enum class LLState { Normal, Highlighted, Found, Removing, Predecessor, Successor };
 
 struct LLNode {
     int   value;
@@ -40,18 +40,24 @@ class LinkedListScreen {
     float  scrollX = 0.0f;
     Button btnScrollLeft, btnScrollRight;
 
-    // Step-by-step (insert & delete)
+    // Mode: Step-by-step vs Instant (same pattern as HeapScreen / TrieScreen)
+    bool   isStepByStep = true;
+    Button btnMode;
+
+    // Step-by-step animation state
     StepOp stepOp     = StepOp::None;
     bool   stepActive = false;
     int    stepPhase  = 0;
     float  stepTimer  = 0.0f;
-    int    stepIdx    = -1;   // inserted index OR delete target index
+    int    stepIdx    = -1;
 
     void LayoutNodes();
     void SetMsg(const char* msg, Color c = {46,160,67,255}, float dur = 2.5f);
     void StartInsertStep(int idx, int v);
     void StartDeleteStep(int idx);
     void AdvanceStep();
+    void InstantInsert(int idx, int v);
+    void InstantDelete(int idx);
     void OnLoadFileTriggered(const std::string& path);
 
     // File dialog runs on background thread to avoid blocking game loop

@@ -105,39 +105,51 @@ void Card::DrawIllustration(Rectangle area) const {
     Color accBright = lerpColor(acc, {255,255,255,255}, 0.45f);
 
     if (target == Screen::LinkedList) {
-        float bw = 46, bh = 30;
-        float gap = 24;
-        int n = 4;
-        float totalW = n * bw + (n - 1) * gap;
-        float sx = cx - totalW / 2.0f;
-        float baseY = cy - bh / 2.0f;
+        // giống ảnh: 2 ngăn outline-only, tỉ lệ 2:1, căn giữa
+        constexpr float DW  = 30.0f;
+        constexpr float PW  = 30.0f;
+        constexpr float NW  = DW + PW;
+        constexpr float NH  = 34.0f;
+        constexpr float ARR = 30.0f;
+        constexpr float STP = NW + ARR;
+        constexpr int   NN  = 4;
 
-        float offY[4], wave[4];
-        for (int i = 0; i < n; i++) {
-            wave[i] = (sinf(t * 2.8f + i * 0.9f) + 1.0f) * 0.5f; // 0..1
-            offY[i] = (wave[i] * 2.0f - 1.0f) * 6.0f * a;          // -6..+6
+        float totalW = NN * STP - ARR;
+        float startX = cx - totalW * 0.5f;
+        float baseY  = cy - NH * 0.5f;
+
+        // hover: nodes nảy lên lần lượt, border/arrow sáng hơn
+        unsigned char bordA  = (unsigned char)(160 + 95 * a);
+        Color cBord  = {255, 255, 255, bordA};
+        Color cDiv   = {255, 255, 255, bordA};
+
+        // mũi tên: cascade sáng trái→phải khi hover
+        for (int i = 0; i < NN - 1; i++) {
+            float wave     = sinf(t * 4.5f - i * 1.1f);
+            float hoverAlp = wave * 0.5f + 0.5f;
+            unsigned char aa = (unsigned char)(160.0f + 95.0f * (0.3f + 0.7f * hoverAlp * a));
+            float thick    = 1.8f + 0.8f * hoverAlp * a;
+
+            Color cArrow = {255, 255, 255, aa};
+            float ay  = baseY + NH * 0.5f;
+            float ax1 = startX + i * STP + NW;
+            float ax2 = ax1 + ARR;
+            DrawLineEx({ax1, ay}, {ax2 - 7, ay}, thick, cArrow);
+            DrawTriangle({ax2, ay}, {ax2 - 8, ay - 5}, {ax2 - 8, ay + 5}, cArrow);
         }
 
-        for (int i = 0; i < n; i++) {
-            float nx = sx + i * (bw + gap);
-            Rectangle box = {nx, baseY + offY[i], bw, bh};
+        // 4 node — cả 2 ngăn không tô màu, chỉ có viền
+        for (int i = 0; i < NN; i++) {
+            float wave    = sinf(t * 3.2f - i * 1.0f);
+            float bounceY = wave * 5.0f * a;
+            float x = startX + i * STP;
+            float y = baseY + bounceY;
 
-            // Fill box with accent color fading in on wave peak
-            float cf = wave[i] * a;
-            Color fillC = {accBright.r, accBright.g, accBright.b,
-                           (unsigned char)(150 * cf)};
-            DrawRectangleRec(box, fillC);
-
-            // Border color: white → accent-bright as wave peaks
-            Color borderC = lerpColor(W, {accBright.r, accBright.g, accBright.b, 230}, cf);
-            DrawRectangleLinesEx(box, 1.8f, borderC);
-
-            if (i < n - 1) {
-                float midY = cy + (offY[i] + offY[i + 1]) / 2.0f;
-                float arrowCf = (wave[i] + wave[i + 1]) * 0.5f * a;
-                Color arrowC = lerpColor(W, {accBright.r, accBright.g, accBright.b, 220}, arrowCf);
-                DrawArrowH(nx + bw, nx + bw + gap, midY, arrowC);
-            }
+            // ngăn trái: tô trắng; ngăn phải: không màu
+            unsigned char fa = (unsigned char)(200 + 30 * a);
+            DrawRectangleRec({x, y, DW, NH}, {255, 255, 255, fa});
+            DrawRectangleLinesEx({x,      y, DW, NH}, 1.8f, cBord);
+            DrawRectangleLinesEx({x + DW, y, PW, NH}, 1.8f, cBord);
         }
 
     } else if (target == Screen::Trie) {
