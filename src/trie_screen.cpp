@@ -29,6 +29,7 @@ TrieScreen::TrieScreen()
     camera.zoom = 1.0f;
 
     pool.emplace_back('$');   
+    pool[0].cnt = 1;
     pool[0].x = pool[0].targetX = 640; 
     pool[0].y = pool[0].targetY = TRIE_TOP_Y; 
     pool[0].alpha = 1.0f;
@@ -118,17 +119,20 @@ Screen TrieScreen::Update() {
             if (currentIdx < (int)pendingWord.size()) {
                 int idx = pendingWord[currentIdx] - 'a';
                 if (isAnimating) {
+                    if(currentIdx == 0)pool[root].cnt++;
                     if (pool[currentNode].children[idx] == -1) {
                         int newNodeIdx = (int)pool.size();
                         pool.emplace_back(pendingWord[currentIdx]);
                         pool[newNodeIdx].x = pool[currentNode].x;
                         pool[newNodeIdx].y = pool[currentNode].y;
+                        pool[newNodeIdx].cnt = 0;
                         pool[currentNode].children[idx] = newNodeIdx;
-                        Layout();
                     }
                     currentNode = pool[currentNode].children[idx];
+                    pool[currentNode].cnt++;
                     highlightPath.push_back(currentNode);
                     currentIdx++;
+                    Layout();
                 } else if (isSearching) {
                     if (pool[currentNode].children[idx] != -1) {
                         currentNode = pool[currentNode].children[idx];
