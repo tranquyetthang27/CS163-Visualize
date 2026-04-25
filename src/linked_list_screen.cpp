@@ -1,10 +1,12 @@
 #include "linked_list_screen.h"
+#include "init_file.h"
 #include "font.h"
 #include "colors.h"
 #include <cstring>
 #include <cstdio>
 #include <cmath>
 #include <stdexcept>
+#include <array>
 
 static constexpr float NODE_R    = 30.0f;
 static constexpr float NODE_GAP  = 44.0f;
@@ -23,11 +25,25 @@ LinkedListScreen::LinkedListScreen()
       btnSearch ({655, 630, 120, 40}, "Search",      Pal::BtnOrange,  Pal::BtnOrangeHov),
       btnUpdate ({805, 630, 120, 40}, "Update",      Pal::Teal,       Pal::TealDark),
       btnBack   ({20,  20,  100, 36}, "< Back",      Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnLoadFile({955, 630, 110, 40}, "Load File",  Pal::BtnNeutral, Pal::BtnNeutHov),
       insertMenuOpen(false), deleteMenuOpen(false),
       msgTimer(0.0f), msgColor(Pal::BtnSuccess),
       btnShowCode  ({1140,  18, 120, 34}, "Show Code", Pal::BtnNeutral, Pal::BtnNeutHov),
-      btnScrollLeft({  10, 330,  44, 44}, "<",         Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnScrollLeft ({  10, 330,  44, 44}, "<",         Pal::BtnNeutral, Pal::BtnNeutHov),
       btnScrollRight({1226, 330,  44, 44}, ">",        Pal::BtnNeutral, Pal::BtnNeutHov) {}
+
+void LinkedListScreen::Reset() {
+    nodes.clear();
+    insertMenuOpen = false; deleteMenuOpen = false;
+    message.clear(); msgTimer = 0.0f;
+    showCode = false; btnShowCode.label = "Show Code";
+    scrollX = 0.0f;
+    stepOp = StepOp::None; stepActive = false;
+    stepPhase = 0; stepTimer = 0.0f; stepIdx = -1;
+    input.Clear();
+    dialogPending.store(false);
+    dialogResult.clear();
+}
 
 void LinkedListScreen::LayoutNodes() {
     int n = (int)nodes.size();
@@ -147,6 +163,26 @@ void LinkedListScreen::AdvanceStep() {
     }
 }
 
+
+void LinkedListScreen::OnLoadFileTriggered(const std::string& path) {
+    std::vector<int> nums = InitFile::loadNumbers(path);
+    if (nums.empty()) {
+        SetMsg("Failed to load or file empty!", Pal::BtnDanger);
+        return;
+    }
+    nodes.clear();
+    for (int v : nums) {
+        LLNode nd;
+        nd.value = v; nd.alpha = 1.0f; nd.state = LLState::Normal;
+        nd.x = nd.tx = 640.0f; nd.y = nd.ty = NODE_Y;
+        nodes.push_back(nd);
+    }
+    LayoutNodes();
+    for (auto& nd : nodes) { nd.x = nd.tx; nd.y = nd.ty; }
+    char buf[64]; snprintf(buf, sizeof(buf), "Loaded %d nodes from file.", (int)nodes.size());
+    SetMsg(buf, Pal::BtnSuccess, 3.0f);
+}
+
 //Update
 
 Screen LinkedListScreen::Update() {
@@ -204,6 +240,36 @@ Screen LinkedListScreen::Update() {
 
     bool doSearch = btnSearch.Update();
     bool doUpdate = btnUpdate.Update();
+
+    // Check if background dialog thread returned a result
+    if (dialogPending.load()) {
+        std::string path;
+        { std::lock_guard<std::mutex> lk(dialogMutex); path = dialogResult; }
+        dialogPending.store(false);
+        if (dialogThread.joinable()) dialogThread.join();
+        if (!path.empty()) OnLoadFileTriggered(path);
+        else SetMsg("No file selected.", Pal::BtnNeutral);
+    }
+
+    if (btnLoadFile.Update() && !dialogPending.load()) {
+        SetMsg("Selecting file...", Pal::BtnNeutral, 60.0f);
+        dialogThread = std::thread([this]() {
+            FILE* pipe = popen(
+                "osascript -e 'POSIX path of (choose file with prompt \"Chon file du lieu:\" of type {\"txt\", \"public.text\"})' 2>/dev/null",
+                "r");
+            std::string result;
+            if (pipe) {
+                char buf[512];
+                while (fgets(buf, sizeof(buf), pipe)) result += buf;
+                pclose(pipe);
+                while (!result.empty() && (result.back() == '\n' || result.back() == '\r'))
+                    result.pop_back();
+            }
+            { std::lock_guard<std::mutex> lk(dialogMutex); dialogResult = result; }
+            dialogPending.store(true);
+        });
+        dialogThread.detach();
+    }
 
     auto parseVal = [&](int& out) -> bool {
         if (input.IsEmpty()) { SetMsg("Enter a value!", {229,57,53,255}); return false; }
@@ -408,6 +474,7 @@ void LinkedListScreen::Draw() const {
     }
     btnSearch.Draw();
     btnUpdate.Draw();
+    btnLoadFile.Draw();
 
     if (msgTimer > 0 && !message.empty()) {
         float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;

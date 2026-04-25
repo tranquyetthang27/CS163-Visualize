@@ -4,6 +4,9 @@
 #include "input_field.h"
 #include <vector>
 #include <string>
+#include <thread>
+#include <atomic>
+#include <mutex>
 
 enum class LLState { Normal, Highlighted, Found, Removing, Predecessor };
 
@@ -23,7 +26,7 @@ class LinkedListScreen {
     InputField input;
     Button btnInsert, btnInsHead, btnInsTail, btnInsIdx;
     Button btnDel,    btnDelHead, btnDelTail, btnDelIdx;
-    Button btnSearch, btnUpdate, btnBack;
+    Button btnSearch, btnUpdate, btnBack, btnLoadFile;
     bool   insertMenuOpen;
     bool   deleteMenuOpen;
 
@@ -49,9 +52,17 @@ class LinkedListScreen {
     void StartInsertStep(int idx, int v);
     void StartDeleteStep(int idx);
     void AdvanceStep();
+    void OnLoadFileTriggered(const std::string& path);
+
+    // File dialog runs on background thread to avoid blocking game loop
+    std::thread           dialogThread;
+    std::atomic<bool>     dialogPending { false };
+    std::mutex            dialogMutex;
+    std::string           dialogResult;
 
 public:
     LinkedListScreen();
+    void   Reset();
     Screen Update();
     void   Draw() const;
 };
