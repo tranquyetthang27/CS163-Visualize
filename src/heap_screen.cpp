@@ -333,7 +333,7 @@ void HeapScreen::Draw() const {
     if (msgTimer > 0 && !message.empty()) {
         float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
         Color c = msgColor; c.a = (unsigned char)(alpha * 220);
-        DrawTextEx(fontRegular, message.c_str(), {900, 646}, 16.0f, 1.0f, c);
+        DrawTextEx(fontRegular, message.c_str(), {900, 100}, 16.0f, 1.0f, c);
     }
 
     char cnt[32]; snprintf(cnt, sizeof(cnt), "Size: %d / %d", n, MAX_SIZE);
