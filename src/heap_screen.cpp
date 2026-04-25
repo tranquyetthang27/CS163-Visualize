@@ -29,7 +29,7 @@ void HeapScreen::InstantInsert(){
         n = (n - 1) / 2;
     }
     ComputePositions();
-    char buf[32]; snprintf(buf, sizeof(buf), "Inserted %d.", heap[idCurrent]);
+    char buf[32]; snprintf(buf, sizeof(buf), "Inserted %d.", heap[n]);
     SetMsg(buf);
 }
 
