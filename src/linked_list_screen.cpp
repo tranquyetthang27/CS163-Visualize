@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cmath>
 #include <stdexcept>
+#include <array>
 
 static constexpr float NODE_R    = 30.0f;
 static constexpr float NODE_GAP  = 44.0f;
@@ -28,8 +29,21 @@ LinkedListScreen::LinkedListScreen()
       insertMenuOpen(false), deleteMenuOpen(false),
       msgTimer(0.0f), msgColor(Pal::BtnSuccess),
       btnShowCode  ({1140,  18, 120, 34}, "Show Code", Pal::BtnNeutral, Pal::BtnNeutHov),
-      btnScrollLeft({  10, 330,  44, 44}, "<",         Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnScrollLeft ({  10, 330,  44, 44}, "<",         Pal::BtnNeutral, Pal::BtnNeutHov),
       btnScrollRight({1226, 330,  44, 44}, ">",        Pal::BtnNeutral, Pal::BtnNeutHov) {}
+
+void LinkedListScreen::Reset() {
+    nodes.clear();
+    insertMenuOpen = false; deleteMenuOpen = false;
+    message.clear(); msgTimer = 0.0f;
+    showCode = false; btnShowCode.label = "Show Code";
+    scrollX = 0.0f;
+    stepOp = StepOp::None; stepActive = false;
+    stepPhase = 0; stepTimer = 0.0f; stepIdx = -1;
+    input.Clear();
+    dialogPending.store(false);
+    dialogResult.clear();
+}
 
 void LinkedListScreen::LayoutNodes() {
     int n = (int)nodes.size();
@@ -149,6 +163,7 @@ void LinkedListScreen::AdvanceStep() {
     }
 }
 
+
 void LinkedListScreen::OnLoadFileTriggered(const std::string& path) {
     std::vector<int> nums = InitFile::loadNumbers(path);
     if (nums.empty()) {
@@ -226,9 +241,34 @@ Screen LinkedListScreen::Update() {
     bool doSearch = btnSearch.Update();
     bool doUpdate = btnUpdate.Update();
 
-    if (btnLoadFile.Update()) {
-        std::string fullPath = std::string(PROJECT_ROOT_PATH) + "data.txt";
-        OnLoadFileTriggered(fullPath);
+    // Check if background dialog thread returned a result
+    if (dialogPending.load()) {
+        std::string path;
+        { std::lock_guard<std::mutex> lk(dialogMutex); path = dialogResult; }
+        dialogPending.store(false);
+        if (dialogThread.joinable()) dialogThread.join();
+        if (!path.empty()) OnLoadFileTriggered(path);
+        else SetMsg("No file selected.", Pal::BtnNeutral);
+    }
+
+    if (btnLoadFile.Update() && !dialogPending.load()) {
+        SetMsg("Selecting file...", Pal::BtnNeutral, 60.0f);
+        dialogThread = std::thread([this]() {
+            FILE* pipe = popen(
+                "osascript -e 'POSIX path of (choose file with prompt \"Chon file du lieu:\" of type {\"txt\", \"public.text\"})' 2>/dev/null",
+                "r");
+            std::string result;
+            if (pipe) {
+                char buf[512];
+                while (fgets(buf, sizeof(buf), pipe)) result += buf;
+                pclose(pipe);
+                while (!result.empty() && (result.back() == '\n' || result.back() == '\r'))
+                    result.pop_back();
+            }
+            { std::lock_guard<std::mutex> lk(dialogMutex); dialogResult = result; }
+            dialogPending.store(true);
+        });
+        dialogThread.detach();
     }
 
     auto parseVal = [&](int& out) -> bool {
