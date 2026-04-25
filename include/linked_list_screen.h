@@ -18,7 +18,7 @@ struct LLNode {
     LLState state;
 };
 
-enum class StepOp { None, Insert, Delete };
+enum class StepOp { None, Insert, Delete, Search, Update };
 
 class LinkedListScreen {
     std::vector<LLNode> nodes;
@@ -50,11 +50,15 @@ class LinkedListScreen {
     int    stepPhase  = 0;
     float  stepTimer  = 0.0f;
     int    stepIdx    = -1;
+    int    stepVal    = 0;
+    int    stepNewVal = 0;
 
     void LayoutNodes();
     void SetMsg(const char* msg, Color c = {46,160,67,255}, float dur = 2.5f);
     void StartInsertStep(int idx, int v);
     void StartDeleteStep(int idx);
+    void StartSearchStep(int v);
+    void StartUpdateStep(int idx, int newVal);
     void AdvanceStep();
     void InstantInsert(int idx, int v);
     void InstantDelete(int idx);

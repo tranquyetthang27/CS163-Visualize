@@ -29,7 +29,7 @@ void Card::Draw() const {
     // Card background
     DrawRectangleRounded(r, 0.08f, 8, Pal::Surface);
 
-    // Colored header (top 60%)
+    // Colored header 
     float headerH = r.height * 0.60f;
     Rectangle header = {r.x, r.y, r.width, headerH};
 
@@ -90,7 +90,7 @@ void Card::DrawIllustration(Rectangle area) const {
     float t = animTime;
     float a = hoverAnim;
 
-    // Helper: lerp two colors by factor 0..1
+    // Helper lerp two colors by factor 0..1
     auto lerpColor = [](Color c0, Color c1, float f) -> Color {
         return {
             (unsigned char)(c0.r + (c1.r - c0.r) * f),
@@ -101,11 +101,10 @@ void Card::DrawIllustration(Rectangle area) const {
     };
     // Accent at full opacity for color mixing
     Color acc = {accent.r, accent.g, accent.b, 255};
-    // Brightened accent: blend accent toward white for the highlight
+    // Brightened accent blend accent toward white for the highlight
     Color accBright = lerpColor(acc, {255,255,255,255}, 0.45f);
 
     if (target == Screen::LinkedList) {
-        // giống ảnh: 2 ngăn outline-only, tỉ lệ 2:1, căn giữa
         constexpr float DW  = 30.0f;
         constexpr float PW  = 30.0f;
         constexpr float NW  = DW + PW;
@@ -118,12 +117,12 @@ void Card::DrawIllustration(Rectangle area) const {
         float startX = cx - totalW * 0.5f;
         float baseY  = cy - NH * 0.5f;
 
-        // hover: nodes nảy lên lần lượt, border/arrow sáng hơn
+        // hover
         unsigned char bordA  = (unsigned char)(160 + 95 * a);
         Color cBord  = {255, 255, 255, bordA};
         Color cDiv   = {255, 255, 255, bordA};
 
-        // mũi tên: cascade sáng trái→phải khi hover
+        //light
         for (int i = 0; i < NN - 1; i++) {
             float wave     = sinf(t * 4.5f - i * 1.1f);
             float hoverAlp = wave * 0.5f + 0.5f;
@@ -138,14 +137,12 @@ void Card::DrawIllustration(Rectangle area) const {
             DrawTriangle({ax2, ay}, {ax2 - 8, ay - 5}, {ax2 - 8, ay + 5}, cArrow);
         }
 
-        // 4 node — cả 2 ngăn không tô màu, chỉ có viền
         for (int i = 0; i < NN; i++) {
             float wave    = sinf(t * 3.2f - i * 1.0f);
             float bounceY = wave * 5.0f * a;
             float x = startX + i * STP;
             float y = baseY + bounceY;
 
-            // ngăn trái: tô trắng; ngăn phải: không màu
             unsigned char fa = (unsigned char)(200 + 30 * a);
             DrawRectangleRec({x, y, DW, NH}, {255, 255, 255, fa});
             DrawRectangleLinesEx({x,      y, DW, NH}, 1.8f, cBord);

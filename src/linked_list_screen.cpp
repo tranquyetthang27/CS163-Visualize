@@ -61,7 +61,7 @@ void LinkedListScreen::SetMsg(const char* msg, Color c, float dur) {
     message = msg; msgColor = c; msgTimer = dur;
 }
 
-// Instant (no animation)
+// Instant
 
 void LinkedListScreen::InstantInsert(int idx, int v) {
     LLNode nd;
@@ -128,6 +128,30 @@ void LinkedListScreen::StartDeleteStep(int idx) {
 }
 
 
+void LinkedListScreen::StartSearchStep(int v) {
+    for (auto& n : nodes) n.state = LLState::Normal;
+    stepOp    = StepOp::Search;
+    stepActive = true;
+    stepPhase  = 0;
+    stepVal    = v;
+    nodes[0].state = LLState::Highlighted;
+    stepTimer  = 0.7f;
+    input.Clear();
+}
+
+void LinkedListScreen::StartUpdateStep(int idx, int newVal) {
+    for (auto& n : nodes) n.state = LLState::Normal;
+    stepOp     = StepOp::Update;
+    stepActive = true;
+    stepPhase  = 0;
+    stepIdx    = idx;
+    stepNewVal = newVal;
+    nodes[0].state = LLState::Highlighted;
+    stepTimer  = 0.7f;
+    input.Clear();
+}
+
+
 void LinkedListScreen::AdvanceStep() {
     //Insert
     if (stepOp == StepOp::Insert) {
@@ -165,12 +189,12 @@ void LinkedListScreen::AdvanceStep() {
         for (auto& n : nodes) n.state = LLState::Normal;
 
         if (stepPhase < stepIdx) {
-            // Still traversing: move pointer to next node
+            // Still traversing move pointer to next node
             nodes[stepPhase].state = LLState::Highlighted;
             stepTimer = 0.7f;
 
         } else if (stepPhase == stepIdx) {
-            // Reached target: mark for deletion
+            // Reached target mark for deletion
             nodes[stepIdx].state = LLState::Removing;
             stepTimer = 0.7f;
 
@@ -195,6 +219,50 @@ void LinkedListScreen::AdvanceStep() {
             for (auto& n : nodes) n.state = LLState::Normal;
             stepActive = false; stepOp = StepOp::None;
             SetMsg("Deleted successfully.", Pal::BtnDanger, 3.0f);
+        }
+    }
+
+    // Search
+    if (stepOp == StepOp::Search) {
+        // Sentinel found display phase done
+        if (stepPhase == (int)nodes.size()) {
+            stepActive = false; stepOp = StepOp::None;
+            return;
+        }
+        for (auto& n : nodes) n.state = LLState::Normal;
+        if (nodes[stepPhase].value == stepVal) {
+            nodes[stepPhase].state = LLState::Found;
+            SetMsg("Found!", Pal::BtnSuccess, 3.0f);
+            stepPhase = (int)nodes.size(); // sentinel show found code line for one phase
+            stepTimer = 0.7f;
+            return;
+        }
+        stepPhase++;
+        if (stepPhase >= (int)nodes.size()) {
+            stepActive = false; stepOp = StepOp::None;
+            SetMsg("Not found!", Pal::BtnDanger, 3.0f);
+            return;
+        }
+        nodes[stepPhase].state = LLState::Highlighted;
+        stepTimer = 0.7f;
+    }
+
+    // Update
+    if (stepOp == StepOp::Update) {
+        for (auto& n : nodes) n.state = LLState::Normal;
+        if (stepPhase < stepIdx) {
+            stepPhase++;
+            nodes[stepPhase].state = LLState::Highlighted;
+            stepTimer = 0.7f;
+        } else if (stepPhase == stepIdx) {
+            nodes[stepIdx].value = stepNewVal;
+            nodes[stepIdx].state = LLState::Highlighted;
+            stepPhase++;  // move to result display phase
+            stepTimer = 0.7f;
+        } else {
+            stepActive = false; stepOp = StepOp::None;
+            char buf[64]; snprintf(buf, sizeof(buf), "Updated index %d to %d.", stepIdx, stepNewVal);
+            SetMsg(buf, Pal::Teal, 3.0f);
         }
     }
 }
@@ -374,12 +442,17 @@ Screen LinkedListScreen::Update() {
     // Search
     else if (doSearch) {
         int v; if (parseVal(v)) {
-            bool found = false;
-            for (auto& nd : nodes) nd.state = LLState::Normal;
-            for (auto& nd : nodes) {
-                if (nd.value == v) { nd.state = LLState::Found; found = true; }
+            if (nodes.empty()) { SetMsg("List is empty!", {229,57,53,255}); }
+            else if (isStepByStep) { StartSearchStep(v); }
+            else {
+                bool found = false;
+                for (auto& nd : nodes) nd.state = LLState::Normal;
+                for (auto& nd : nodes) {
+                    if (nd.value == v) { nd.state = LLState::Found; found = true; }
+                }
+                SetMsg(found ? "Found!" : "Not found!", found ? Pal::BtnSuccess : Pal::BtnDanger);
+                input.Clear();
             }
-            SetMsg(found ? "Found!" : "Not found!", found ? Pal::BtnSuccess : Pal::BtnDanger);
         }
     }
     // Update
@@ -394,10 +467,12 @@ Screen LinkedListScreen::Update() {
             else if (idx < 0 || idx >= (int)nodes.size()) {
                 char buf[64]; snprintf(buf, sizeof(buf), "Index out of range (0-%d)!", (int)nodes.size()-1);
                 SetMsg(buf, {229,57,53,255});
+            } else if (isStepByStep) {
+                StartUpdateStep(idx, newVal);
             } else {
                 for (auto& nd : nodes) nd.state = LLState::Normal;
                 nodes[idx].value = newVal;
-                nodes[idx].state = LLState::Highlighted;
+                nodes[idx].state = LLState::Normal;
                 char buf[64]; snprintf(buf, sizeof(buf), "Updated index %d to %d.", idx, newVal);
                 SetMsg(buf, Pal::Teal);
                 input.Clear();
@@ -432,7 +507,7 @@ void LinkedListScreen::Draw() const {
 
     int n = (int)nodes.size();
 
-    // Arrows: hide arrow from new node to successor until phase 3; hide both arrows until phase 2
+    // Arrows hide arrow from new node to successor until phase 3; hide both arrows until phase 2
     for (int i = 0; i < n - 1; i++) {
         if (stepActive && stepOp == StepOp::Insert) {
             if (stepPhase < 2 && (i == stepIdx || i + 1 == stepIdx)) continue;
@@ -475,11 +550,35 @@ void LinkedListScreen::Draw() const {
         constexpr float PX = 878, PY = 86;
         constexpr float PW = 385, LH = 22;
 
-        const char* codeLines[7] = {};
-        bool hl[7] = {};
+        const char* codeLines[8] = {};
+        bool hl[8] = {};
         int NUM_LINES = 6;
 
-        if (stepOp == StepOp::Delete) {
+        if (stepOp == StepOp::Search) {
+            codeLines[0] = "node* cur = head;";
+            codeLines[1] = "while (cur != nullptr) {";
+            codeLines[2] = "    if (cur->data == val)";
+            codeLines[3] = "        return cur;";
+            codeLines[4] = "    cur = cur->next;";
+            codeLines[5] = "}";
+            codeLines[6] = "return nullptr;";
+            NUM_LINES = 7;
+
+            int N = (int)nodes.size();
+            if (stepPhase == 0)        hl[0] = true;               
+            else if (stepPhase < N)    hl[1] = hl[4] = true;         
+            else if (stepPhase == N)   hl[2] = hl[3] = true;        
+        } else if (stepOp == StepOp::Update) {
+            codeLines[0] = "node* cur = head;";
+            codeLines[1] = "for (int i = 0; i < idx; i++)";
+            codeLines[2] = "    cur = cur->next;";
+            codeLines[3] = "cur->data = newVal;";
+            NUM_LINES = 4;
+
+            if (stepPhase == 0)              hl[0] = true;
+            else if (stepPhase <= stepIdx)   hl[1] = hl[2] = true;
+            else                             hl[3] = true;
+        } else if (stepOp == StepOp::Delete) {
             // Delete code
             codeLines[0] = "node* cur = head;";
             codeLines[1] = "for (int i = 0; i < idx-1; i++)";
