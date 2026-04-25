@@ -186,9 +186,9 @@ GraphScreen::GraphScreen()
             inputScrollDragOffset(0.0f),
       btnBack({20, 20, 100, 36}, "< Back", Pal::BtnNeutral, Pal::BtnNeutHov),
     btnDelete({20, 642, 130, 40}, "Delete", Pal::BtnDanger, Pal::BtnDangHov),
-    btnChange({160, 642, 130, 40}, "Change", Pal::BtnPrimary, Pal::BtnPrimHov),
+        btnChange({160, 642, 130, 40}, "Change", Pal::BtnNeutral, Pal::BtnNeutHov),
     btnAddNode({300, 642, 130, 40}, "Add Node", Pal::BtnSuccess, Pal::BtnSuccHov),
-    btnAddEdge({440, 642, 130, 40}, "Add Edge", Pal::BtnNeutral, Pal::BtnNeutHov),
+        btnAddEdge({440, 642, 130, 40}, "Add Edge", Pal::BtnPrimary, Pal::BtnPrimHov),
     btnKruskal({580, 642, 130, 40}, "Kruskal", Pal::BtnSuccess, Pal::BtnSuccHov),
     btnPrim({720, 642, 130, 40}, "Prim", Pal::BtnPrimary, Pal::BtnPrimHov),
       mstCurrentStep(0),
@@ -915,10 +915,10 @@ void GraphScreen::Draw() const {
 
     DrawRectangleRec({0, 0, 1280, 72}, Pal::Surface);
     DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
-    DrawTextEx(fontBold, "Minimum spanning tree", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
+    DrawTextEx(fontBold, "Minimum Spanning Tree", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
     DrawTextEx(
         fontRegular,
-        "Left: graph preview. Right: choose input style (Edge List / Matrix / List).",
+        "Left: graph preview. Right: choose input style (Edge List / Adjacency Matrix / Adjacency List).",
         {130, 52},
         13.0f,
         1.0f,

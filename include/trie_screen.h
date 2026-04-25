@@ -7,13 +7,14 @@
 #include <queue>
 struct TrieNode {
     int children[26];
+    int cnt;
     bool isEnd;
     float x, y, alpha;
     float targetX, targetY;
     int leafCount;
     char ch;
 
-    TrieNode(char c) : ch(c), isEnd(false), x(640), y(140), alpha(0), targetX(640), targetY(140), leafCount(0) {
+    TrieNode(char c) : ch(c), cnt(0), isEnd(false), x(640), y(140), alpha(0), targetX(640), targetY(140), leafCount(0) {
         for (int i = 0; i < 26; i++) children[i] = -1;
     }
 };
@@ -25,7 +26,7 @@ class TrieScreen {
     Camera2D camera;
 
     InputField input;
-    Button btnInsert, btnSearch, btnClear, btnBack, btnLoad;
+    Button btnInsert, btnSearch, btnClear, btnBack, btnLoad, btnDelete;
     std::string message;
     float msgTimer;
     Color msgColor;
@@ -43,7 +44,6 @@ class TrieScreen {
     void LayoutSubtree(int node, float x, float y, float spread);
     int UpdateLeafCount(int node);
     void SetMsg(const char* msg, Color c = {46, 160, 67, 255}, float dur = 2.5f);
-
 public:
     TrieScreen();
     Screen Update();
@@ -58,9 +58,11 @@ private:
     void DrawAllNodes(int node);
     
     void InstantInsert(const std::string& word);
-    void InstantSearch(const std::string& word);
+    bool InstantSearch(const std::string& word);
     void OnLoadFileTriggered(const std::string& path);
 
     void StartInsert(const std::string& word);
     void StartSearch(const std::string& word);
+
+    void Delete(const std::string& word);
 };
