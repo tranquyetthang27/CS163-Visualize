@@ -161,7 +161,11 @@ Screen TrieScreen::Update() {
     bool clickInsert = btnInsert.Update() || (input.focused && IsKeyPressed(KEY_ENTER));
     bool clickSearch = btnSearch.Update();
     bool clickClear = btnClear.Update();
+    bool clickDelete = btnDelete.Update();
 
+    if(clickDelete){
+        
+    }
     if (clickClear) {
         pool.clear();
         pool.emplace_back('$');
