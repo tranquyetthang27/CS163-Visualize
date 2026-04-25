@@ -20,9 +20,10 @@ TrieScreen::TrieScreen()
       btnToggleMode({500, 636, 140, 40}, "Mode: Step", Pal::BtnNeutral, Pal::BtnNeutHov), 
       btnLoad   ({650, 636, 110, 40}, "Load File", Pal::BtnNeutral, Pal::BtnNeutHov),
       btnBack   ({20,  20,  100, 36}, "< Back",    Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnDelete ({780, 636, 110, 40}, "Delete", Pal::BtnNeutral, Pal::BtnNeutHov),
       msgTimer(0), msgColor(Pal::BtnSuccess), root(0)
 {
-    camera.target = (Vector2){ 640, TRIE_TOP_Y }; // Nhìn vào gốc của cây Trie
+    camera.target = (Vector2){ 640, TRIE_TOP_Y };
     camera.offset = (Vector2){ GetScreenWidth()/2.0f, GetScreenHeight()/3.0f };
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
@@ -301,7 +302,7 @@ void TrieScreen::Draw(){
     btnToggleMode.Draw();
     btnBack.Draw();
     btnLoad.Draw();
-
+    btnDelete.Draw();
     if (msgTimer > 0 && !message.empty()) {
         float fade = (msgTimer < 0.5f) ? (msgTimer / 0.5f) : 1.0f;
         Color c = msgColor; 

@@ -25,7 +25,7 @@ class TrieScreen {
     Camera2D camera;
 
     InputField input;
-    Button btnInsert, btnSearch, btnClear, btnBack, btnLoad;
+    Button btnInsert, btnSearch, btnClear, btnBack, btnLoad, btnDelete;
     std::string message;
     float msgTimer;
     Color msgColor;
@@ -43,7 +43,6 @@ class TrieScreen {
     void LayoutSubtree(int node, float x, float y, float spread);
     int UpdateLeafCount(int node);
     void SetMsg(const char* msg, Color c = {46, 160, 67, 255}, float dur = 2.5f);
-
 public:
     TrieScreen();
     Screen Update();
@@ -63,4 +62,6 @@ private:
 
     void StartInsert(const std::string& word);
     void StartSearch(const std::string& word);
+
+    void Delete(const std::string& word);
 };
