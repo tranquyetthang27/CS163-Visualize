@@ -17,6 +17,7 @@ HeapScreen::HeapScreen()
       btnDelMax ({460, 636, 140, 40}, "Delete Max", Pal::BtnDanger,  Pal::BtnDangHov),
       btnBack   ({20,  20,  100, 36}, "< Back",     Pal::BtnNeutral, Pal::BtnNeutHov),
       btnMode   ({620, 636 , 140, 40}, "Mode: Step", Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnLoad   ({780, 636 , 140, 40}, "Load File", Pal::BtnNeutral, Pal::BtnNeutHov),
       msgTimer(0), msgColor(Pal::BtnSuccess),
       animA(-1), animB(-1), animC(-1), idCurrent(0), stepTimer(0), doingInsert(false), doingDelete(false), isHighlight(false), isStepByStep(true)
 {}
@@ -28,6 +29,8 @@ void HeapScreen::InstantInsert(){
         n = (n - 1) / 2;
     }
     ComputePositions();
+    char buf[32]; snprintf(buf, sizeof(buf), "Inserted %d.", heap[idCurrent]);
+    SetMsg(buf);
 }
 
 void HeapScreen::InstantDel(){
@@ -43,6 +46,8 @@ void HeapScreen::InstantDel(){
         if(r < n && heap[r] > heap[largest])largest = r;
         if(largest == id){
             ComputePositions();
+            char buf[32]; snprintf(buf, sizeof(buf), "Deleted max (Instant).");
+            SetMsg(buf, Pal::BtnDanger);
             break;
         }
         else{
@@ -168,25 +173,35 @@ Screen HeapScreen::Update() {
     if(doingInsert || doingDelete)return Screen::Heap;
 
     if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) return Screen::Home;
-    input.Update();
+    bool doIns;
+    bool doDelMax;
+    if(loadQueue.empty()){
+        input.Update();
 
-    if(btnMode.Update()){
-        isStepByStep = !isStepByStep;
-        if(btnMode.label == "Mode: Step"){
-            btnMode.label = "Mode: Instant";
-            btnMode.baseColor = Pal::BtnPrimary;
+        if(btnMode.Update()){
+            isStepByStep = !isStepByStep;
+            if(btnMode.label == "Mode: Step"){
+                btnMode.label = "Mode: Instant";
+                btnMode.baseColor = Pal::BtnPrimary;
+            }
+            else{
+                btnMode.label = "Mode: Step";
+                btnMode.baseColor = Pal::BtnNeutral;
+            }
         }
-        else{
-            btnMode.label = "Mode: Step";
-            btnMode.baseColor = Pal::BtnNeutral;
-        }
+
+        doIns    = btnInsert.Update() || (input.focused && IsKeyPressed(KEY_ENTER));
+        doDelMax = btnDelMax.Update();
     }
 
-    bool doIns    = btnInsert.Update() || (input.focused && IsKeyPressed(KEY_ENTER));
-    bool doDelMax = btnDelMax.Update();
-
-    if (doIns && !input.IsEmpty() ) {
-        int v; try { v = std::stoi(input.text); } catch(...) { SetMsg("Invalid number!", Pal::BtnDanger); return Screen::Heap; }
+    if ( (doIns && !input.IsEmpty()) || !loadQueue.empty() ) {
+        int v; 
+        
+        if(!loadQueue.empty()){
+            v = loadQueue.front();
+            loadQueue.pop();
+        }
+        else try { v = std::stoi(input.text); } catch(...) { SetMsg("Invalid number!", Pal::BtnDanger); return Screen::Heap; }
         if ((int)heap.size() >= MAX_SIZE) {
             SetMsg("Heap full (max 15)!", Pal::BtnDanger);
         } else {
@@ -217,6 +232,24 @@ Screen HeapScreen::Update() {
         }
         else{
             InstantDel();
+        }
+    }
+
+    if (btnLoad.Update()) {
+        std::string fullPath = std::string(PROJECT_ROOT_PATH) + "data.txt";
+        std::vector<int> intList = InitFile::loadNumbers(fullPath);
+
+        if (intList.empty()) {
+            SetMsg("Failed to load or file empty", Pal::BtnDanger);
+            return Screen::Heap;
+        }
+
+        if (isStepByStep) {
+            for (const int& w : intList) loadQueue.push(w);
+            SetMsg("Processing file step-by-step...", Pal::BtnOrange);
+        } else {
+            for (const int& w : intList) loadQueue.push(w);
+            SetMsg("File loaded successfully (Instant)!");
         }
     }
 
@@ -295,11 +328,12 @@ void HeapScreen::Draw() const {
     input.Draw();
     btnDelMax.Draw();
     btnMode.Draw();
+    btnLoad.Draw();
     // Message
     if (msgTimer > 0 && !message.empty()) {
         float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
         Color c = msgColor; c.a = (unsigned char)(alpha * 220);
-        DrawTextEx(fontRegular, message.c_str(), {620, 646}, 16.0f, 1.0f, c);
+        DrawTextEx(fontRegular, message.c_str(), {900, 646}, 16.0f, 1.0f, c);
     }
 
     char cnt[32]; snprintf(cnt, sizeof(cnt), "Size: %d / %d", n, MAX_SIZE);

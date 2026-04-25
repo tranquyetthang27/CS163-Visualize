@@ -4,6 +4,8 @@
 #include "input_field.h"
 #include <vector>
 #include <string>
+#include <queue>
+#include "init_file.h"
 
 enum class HeapAnimStep { Idle, SwapUp, SwapDown };
 
@@ -18,8 +20,10 @@ class HeapScreen {
     std::vector<int> heap;   // max-heap array
     std::vector<HeapNodeVis> vis;
 
+    std::queue<int> loadQueue;
+
     InputField input;
-    Button btnInsert, btnDelMax, btnBack, btnMode;
+    Button btnInsert, btnDelMax, btnBack, btnMode, btnLoad;
 
     std::string message;
     float       msgTimer;
