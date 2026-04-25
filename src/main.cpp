@@ -13,7 +13,7 @@
 #include "graph_screen.h"
 
 int main() {
-    SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_HIGHDPI);
+    SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
     InitWindow(1280, 720, "Data Structure Visualization");
     SetTargetFPS(120);
     InitAudioDevice();
