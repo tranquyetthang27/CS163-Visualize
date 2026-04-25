@@ -16,6 +16,7 @@ HeapScreen::HeapScreen()
       btnInsert({20,  636, 120, 40}, "Insert",     Pal::BtnPrimary, Pal::BtnPrimHov),
       btnDelMax ({460, 636, 140, 40}, "Delete Max", Pal::BtnDanger,  Pal::BtnDangHov),
       btnBack   ({20,  20,  100, 36}, "< Back",     Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnMode   ({620, 636 , 140, 40}, "Mode: Step", Pal::BtnNeutral, Pal::BtnNeutHov),
       msgTimer(0), msgColor(Pal::BtnSuccess),
       animA(-1), animB(-1), animC(-1), idCurrent(0), stepTimer(0), doingInsert(false), doingDelete(false), isHighlight(false), isStepByStep(true)
 {}
@@ -138,6 +139,18 @@ Screen HeapScreen::Update() {
     if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) return Screen::Home;
     input.Update();
 
+    if(btnMode.Update()){
+        isStepByStep = !isStepByStep;
+        if(btnMode.label == "Mode: Step"){
+            btnMode.label = "Mode: Instant";
+            btnMode.baseColor = Pal::BtnPrimary;
+        }
+        else{
+            btnMode.label = "Mode: Step";
+            btnMode.baseColor = Pal::BtnNeutral;
+        }
+    }
+
     bool doIns    = btnInsert.Update() || (input.focused && IsKeyPressed(KEY_ENTER));
     bool doDelMax = btnDelMax.Update();
 
@@ -240,7 +253,7 @@ void HeapScreen::Draw() const {
     btnInsert.Draw();
     input.Draw();
     btnDelMax.Draw();
-
+    btnMode.Draw();
     // Message
     if (msgTimer > 0 && !message.empty()) {
         float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;

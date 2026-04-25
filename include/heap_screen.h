@@ -19,7 +19,7 @@ class HeapScreen {
     std::vector<HeapNodeVis> vis;
 
     InputField input;
-    Button btnInsert, btnDelMax, btnBack;
+    Button btnInsert, btnDelMax, btnBack, btnMode;
 
     std::string message;
     float       msgTimer;
