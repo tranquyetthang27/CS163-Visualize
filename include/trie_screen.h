@@ -7,13 +7,14 @@
 #include <queue>
 struct TrieNode {
     int children[26];
+    int cnt;
     bool isEnd;
     float x, y, alpha;
     float targetX, targetY;
     int leafCount;
     char ch;
 
-    TrieNode(char c) : ch(c), isEnd(false), x(640), y(140), alpha(0), targetX(640), targetY(140), leafCount(0) {
+    TrieNode(char c) : ch(c), cnt(0), isEnd(false), x(640), y(140), alpha(0), targetX(640), targetY(140), leafCount(0) {
         for (int i = 0; i < 26; i++) children[i] = -1;
     }
 };
@@ -57,7 +58,7 @@ private:
     void DrawAllNodes(int node);
     
     void InstantInsert(const std::string& word);
-    void InstantSearch(const std::string& word);
+    bool InstantSearch(const std::string& word);
     void OnLoadFileTriggered(const std::string& path);
 
     void StartInsert(const std::string& word);
