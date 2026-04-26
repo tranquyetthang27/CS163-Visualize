@@ -65,4 +65,5 @@ private:
     void StartSearch(const std::string& word);
 
     void Delete(const std::string& word);
+    bool IsValidChild(int parent, int charIdx);
 };

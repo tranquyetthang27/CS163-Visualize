@@ -118,30 +118,33 @@ Screen TrieScreen::Update() {
             stepTimer = 0.0f;
             if (currentIdx < (int)pendingWord.size()) {
                 int idx = pendingWord[currentIdx] - 'a';
+                
                 if (isAnimating) {
-                    if(currentIdx == 0)pool[root].cnt++;
+                    if (currentIdx == 0) pool[root].cnt++; 
                     if (pool[currentNode].children[idx] == -1) {
                         int newNodeIdx = (int)pool.size();
                         pool.emplace_back(pendingWord[currentIdx]);
                         pool[newNodeIdx].x = pool[currentNode].x;
                         pool[newNodeIdx].y = pool[currentNode].y;
-                        pool[newNodeIdx].cnt = 0;
+                        pool[newNodeIdx].cnt = 0; 
                         pool[currentNode].children[idx] = newNodeIdx;
                     }
                     currentNode = pool[currentNode].children[idx];
                     pool[currentNode].cnt++;
-                    highlightPath.push_back(currentNode);
+                    highlightPath.push_back(currentNode); 
                     currentIdx++;
                     Layout();
-                }else if (isSearching) {
-                    if (pool[currentNode].children[idx] != -1 && pool[pool[currentNode].children[idx]].cnt > 0) {
+                } 
+                else if (isSearching) { 
+                    if (IsValidChild(currentNode, idx)) {
                         currentNode = pool[currentNode].children[idx];
-                        highlightPath.push_back(currentNode);
+                        highlightPath.push_back(currentNode); 
                         currentIdx++;
                     } else {
                         isSearching = false;
-                        SetMsg(isDeletingStep ? "Not found to delete" : "Not Found", Pal::BtnDanger);
+                        SetMsg(isDeletingStep ? "Word not found to delete" : "Not Found", Pal::BtnDanger);
                         isDeletingStep = false;
+                        highlightPath.clear();  
                     }
                 }
             } else {
@@ -414,26 +417,29 @@ void TrieScreen::OnLoadFileTriggered(const std::string& path) {
     }
 }
 
-void TrieScreen::Delete(const std::string& word){
-    if(!InstantSearch(word)) return;
-    
+void TrieScreen::Delete(const std::string& word) {
+    if (!InstantSearch(word)) return;
     int cur = root;
-    pool[cur].cnt--;
-    for(char c: word){
+    pool[cur].cnt--; 
+    for (char c : word) {
         int idx = tolower(c) - 'a';
-        int nextnode = pool[cur].children[idx];
-        if(nextnode == -1) break;
+        int next = pool[cur].children[idx];
         
-        pool[nextnode].cnt--; 
-        if(pool[nextnode].cnt <= 0){
-            pool[cur].children[idx] = -1; 
+        pool[next].cnt--;
+        if (pool[next].cnt <= 0) {
+            pool[cur].children[idx] = -1;
         }
-        cur = nextnode;
+        cur = next;
     }
-    if(cur != -1) {
-        pool[cur].isEnd = false; 
-    }
-    highlightPath.clear();
-    SetMsg("Deleted successfully!");
-    Layout();
+    
+    if (cur != -1) pool[cur].isEnd = false; 
+
+    highlightPath.clear(); 
+    Layout(); 
+    SetMsg("Word deleted!", Pal::BtnSuccess);
+}
+
+bool TrieScreen::IsValidChild(int parent, int charIdx) {
+    int child = pool[parent].children[charIdx];
+    return (child != -1 && pool[child].cnt > 0);
 }
