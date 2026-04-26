@@ -28,11 +28,13 @@ TrieScreen::TrieScreen()
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
 
-    pool.emplace_back('$');   
+    pool.emplace_back('$');
     pool[0].cnt = 1;
-    pool[0].x = pool[0].targetX = 640; 
-    pool[0].y = pool[0].targetY = TRIE_TOP_Y; 
+    pool[0].x = pool[0].targetX = 640;
+    pool[0].y = pool[0].targetY = TRIE_TOP_Y;
     pool[0].alpha = 1.0f;
+
+    input.focused = true;
 }
 
 
@@ -44,7 +46,7 @@ int TrieScreen::UpdateLeafCount(int node) {
     if (node == -1 || pool[node].cnt <= 0) return 0;
     int cnt = 0;
     bool isLeaf = true;
-    for (int i = 0; i < 26; i++) {
+    for (int i = 0; i < 128; i++) {
         int child = pool[node].children[i];
         if (child != -1 && pool[child].cnt > 0) {
             cnt += UpdateLeafCount(pool[node].children[i]);
@@ -64,7 +66,7 @@ void TrieScreen::LayoutSubtree(int node, float x, float y, float spread) {
     int totalLeaves = pool[node].leafCount;
 
     float curX = x - spread / 2.0f;
-    for (int i = 0; i < 26; i++) {
+    for (int i = 0; i < 128; i++) {
         int c = pool[node].children[i];
         if (c == -1) continue;
         
@@ -117,7 +119,7 @@ Screen TrieScreen::Update() {
         if (stepTimer >= 0.5f) {
             stepTimer = 0.0f;
             if (currentIdx < (int)pendingWord.size()) {
-                int idx = pendingWord[currentIdx] - 'a';
+                int idx = (unsigned char)pendingWord[currentIdx];
                 
                 if (isAnimating) {
                     if (currentIdx == 0) pool[root].cnt++; 
@@ -184,7 +186,7 @@ Screen TrieScreen::Update() {
 
     if(clickDelete && !input.IsEmpty()){
         std::string clean;
-        for(char c: input.text) if(isalpha(c)) clean += (char)tolower(c);
+        clean = input.text;
         
         if(!clean.empty()){
             if (isStepByStep) {
@@ -195,6 +197,7 @@ Screen TrieScreen::Update() {
             }
         }
         input.Clear();
+        input.focused = true;
     }
     if (clickClear) {
         pool.clear();
@@ -204,6 +207,7 @@ Screen TrieScreen::Update() {
         pool[0].alpha = 1.0f;
         highlightPath.clear();
         input.Clear();
+        input.focused = true;
         isAnimating = isSearching = isDeletingStep = false;
         SetMsg("Trie cleared.", Pal::BtnNeutral);
         return Screen::Trie;
@@ -211,22 +215,23 @@ Screen TrieScreen::Update() {
 
     if ((clickInsert || clickSearch) && !input.IsEmpty()) {
         std::string clean;
-        for (char c : input.text) if (isalpha(c)) clean += (char)tolower(c);
-        
+        clean = input.text;
+
         if (!clean.empty()) {
             if (isStepByStep) {
                 if (clickInsert) StartInsert(clean);
                 else StartSearch(clean);
             } else {
                 if (clickInsert) {
-                    InstantInsert(clean); 
+                    InstantInsert(clean);
                     SetMsg("Inserted (Instant)");
                 } else {
-                    InstantSearch(clean); 
+                    InstantSearch(clean);
                 }
             }
         }
         input.Clear();
+        input.focused = true;
     }
 
     if (btnLoad.Update()) {
@@ -262,7 +267,7 @@ void TrieScreen::StartSearch(const std::string& word) {
 
 void TrieScreen::DrawAllEdges(int node) {
     if(node == -1 || pool[node].cnt <= 0)return;
-    for (int i = 0; i < 26; i++) {
+    for (int i = 0; i < 128; i++) {
         int c = pool[node].children[i];
         if (c == -1) continue;
 
@@ -323,7 +328,7 @@ void TrieScreen::DrawAllNodes(int node){
         DrawTextEx(fontBold, countStr.c_str(), txtPos, fontSize, 1.0f, WHITE);
     }
 
-    for (int i = 0; i < 26; i++) {
+    for (int i = 0; i < 128; i++) {
         if (pool[node].children[i] != -1) DrawAllNodes(pool[node].children[i]);
     }
 }
@@ -376,7 +381,7 @@ bool TrieScreen::InstantSearch(const std::string& word) {
     highlightPath.push_back(root);
 
     for (char c : word) {
-        int idx = tolower(c) - 'a';
+        int idx = (unsigned char)c;
         if (!IsValidChild(curr, idx)) {
             SetMsg("Not Found", Pal::BtnDanger);
             return false;
@@ -398,10 +403,10 @@ void TrieScreen::InstantInsert(const std::string& word) {
     int curr = root;
     pool[curr].cnt++;
     for (char c : word) {
-        int idx = tolower(c) - 'a';
+        int idx = (unsigned char)c;
         if (pool[curr].children[idx] == -1) {
             int newNodeIdx = (int)pool.size();
-            pool.emplace_back(tolower(c));
+            pool.emplace_back(c);
             pool[newNodeIdx].x = pool[curr].x;
             pool[newNodeIdx].y = pool[curr].y;
             pool[curr].children[idx] = newNodeIdx;
@@ -437,7 +442,7 @@ void TrieScreen::Delete(const std::string& word) {
     pool[cur].cnt--; 
 
     for (char c : word) {
-        int idx = tolower(c) - 'a';
+        int idx = (unsigned char)c;
         int next = pool[cur].children[idx];
         
         pool[next].cnt--;

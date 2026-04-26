@@ -6,7 +6,7 @@
 #include <vector>
 #include <queue>
 struct TrieNode {
-    int children[26];
+    int children[128];
     int cnt;
     int endCount;
     float x, y, alpha;
@@ -15,7 +15,7 @@ struct TrieNode {
     char ch;
 
     TrieNode(char c) : ch(c), cnt(0), endCount(0), x(640), y(140), alpha(0), targetX(640), targetY(140), leafCount(0) {
-        for (int i = 0; i < 26; i++) children[i] = -1;
+        for (int i = 0; i < 128; i++) children[i] = -1;
     }
 };
 
