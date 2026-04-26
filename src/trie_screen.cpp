@@ -306,6 +306,22 @@ void TrieScreen::DrawAllNodes(int node){
         Vector2 ts = MeasureTextEx(fontBold, buf, 18.0f, 1.0f);
         DrawTextEx(fontBold, buf, {pool[node].x - ts.x / 2, pool[node].y - ts.y / 2}, 18.0f, 1.0f, textC);
     }
+    if (pool[node].endCount > 0) {
+        Vector2 badgePos = { pool[node].x + 14, pool[node].y - 14 };
+        float badgeRadius = 9.0f; 
+        unsigned char a = (unsigned char)(pool[node].alpha * 255);
+        
+        Color badgeBg = { 231, 76, 60, a }; 
+        DrawCircleV(badgePos, badgeRadius, badgeBg);
+        DrawCircleLinesV(badgePos, badgeRadius, { 255, 255, 255, (unsigned char)(a/2) });
+
+        std::string countStr = std::to_string(pool[node].endCount);
+        float fontSize = 11.0f;
+        Vector2 txtSize = MeasureTextEx(fontBold, countStr.c_str(), fontSize, 1.0f);
+    
+        Vector2 txtPos = { badgePos.x - txtSize.x / 2, badgePos.y - txtSize.y / 2 };
+        DrawTextEx(fontBold, countStr.c_str(), txtPos, fontSize, 1.0f, WHITE);
+    }
 
     for (int i = 0; i < 26; i++) {
         if (pool[node].children[i] != -1) DrawAllNodes(pool[node].children[i]);
@@ -415,7 +431,6 @@ void TrieScreen::OnLoadFileTriggered(const std::string& path) {
 }
 
 void TrieScreen::Delete(const std::string& word) {
-    // Kiểm tra xem từ có tồn tại (ít nhất 1 instance) không
     if (!InstantSearch(word)) return; 
 
     int cur = root;
@@ -426,7 +441,6 @@ void TrieScreen::Delete(const std::string& word) {
         int next = pool[cur].children[idx];
         
         pool[next].cnt--;
-        // Nếu không còn từ nào đi qua node này, ngắt kết nối
         if (pool[next].cnt <= 0) {
             pool[cur].children[idx] = -1;
         }
