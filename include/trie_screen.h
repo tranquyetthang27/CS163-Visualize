@@ -8,13 +8,13 @@
 struct TrieNode {
     int children[26];
     int cnt;
-    bool isEnd;
+    int endCount;
     float x, y, alpha;
     float targetX, targetY;
     int leafCount;
     char ch;
 
-    TrieNode(char c) : ch(c), cnt(0), isEnd(false), x(640), y(140), alpha(0), targetX(640), targetY(140), leafCount(0) {
+    TrieNode(char c) : ch(c), cnt(0), endCount(0), x(640), y(140), alpha(0), targetX(640), targetY(140), leafCount(0) {
         for (int i = 0; i < 26; i++) children[i] = -1;
     }
 };

@@ -147,12 +147,12 @@ Screen TrieScreen::Update() {
                         highlightPath.clear();  
                     }
                 }
-            } else {
+            } else { 
                 if (isAnimating) {
-                    pool[currentNode].isEnd = true;
+                    pool[currentNode].endCount++;
                     SetMsg("Inserted successfully!");
                 } else if (isSearching) {
-                    if (pool[currentNode].isEnd) {
+                    if (pool[currentNode].endCount > 0) {
                         if (isDeletingStep) {
                             Delete(pendingWord); 
                             isDeletingStep = false; 
@@ -160,7 +160,7 @@ Screen TrieScreen::Update() {
                             SetMsg("Found!", Pal::BtnSuccess);
                         }
                     } else {
-                        SetMsg(isDeletingStep ? "Not found to delete" : "Prefix exists, but word not found", Pal::BtnOrange);
+                        SetMsg(isDeletingStep ? "Not found to delete" : "Prefix exists", Pal::BtnOrange);
                         isDeletingStep = false;
                     }
                 }
@@ -293,7 +293,7 @@ void TrieScreen::DrawAllNodes(int node){
     unsigned char a = (unsigned char)(pool[node].alpha * 255);
     fillC.a = bordC.a = textC.a = a;
 
-    if (pool[node].isEnd) {
+    if (pool[node].endCount > 0) {
         Color ringC = {63, 81, 181, (unsigned char)(a / 2)};
         DrawCircleV({pool[node].x, pool[node].y}, NODE_R + 5, ringC);
     }
@@ -354,6 +354,30 @@ void TrieScreen::Draw(){
     DrawTextEx(fontRegular, cnt, {1140, 646}, 15.0f, 1.0f, Pal::TxtMid);
 }
 
+bool TrieScreen::InstantSearch(const std::string& word) {
+    int curr = root;
+    highlightPath.clear();
+    highlightPath.push_back(root);
+
+    for (char c : word) {
+        int idx = tolower(c) - 'a';
+        if (!IsValidChild(curr, idx)) {
+            SetMsg("Not Found", Pal::BtnDanger);
+            return false;
+        }
+        curr = pool[curr].children[idx];
+        highlightPath.push_back(curr);
+    }
+
+    if (pool[curr].endCount > 0) {
+        SetMsg("Found!", Pal::BtnSuccess);
+        return true;
+    }
+    SetMsg("Prefix exists, but word not found", Pal::BtnOrange);
+    return false;
+}
+
+
 void TrieScreen::InstantInsert(const std::string& word) {
     int curr = root;
     pool[curr].cnt++;
@@ -362,7 +386,6 @@ void TrieScreen::InstantInsert(const std::string& word) {
         if (pool[curr].children[idx] == -1) {
             int newNodeIdx = (int)pool.size();
             pool.emplace_back(tolower(c));
-            pool[newNodeIdx].alpha = 1.0f; 
             pool[newNodeIdx].x = pool[curr].x;
             pool[newNodeIdx].y = pool[curr].y;
             pool[curr].children[idx] = newNodeIdx;
@@ -370,34 +393,8 @@ void TrieScreen::InstantInsert(const std::string& word) {
         curr = pool[curr].children[idx];
         pool[curr].cnt++;
     }
-    pool[curr].isEnd = true;
+    pool[curr].endCount++; 
     Layout(); 
-}
-
-
-bool TrieScreen::InstantSearch(const std::string& word) {
-    int curr = root;
-    highlightPath.clear();
-    highlightPath.push_back(root);
-
-    for (char c : word) {
-        int idx = tolower(c) - 'a';
-        if (pool[curr].children[idx] == -1 || pool[pool[curr].children[idx]].cnt <= 0) {
-            SetMsg("Not Found", Pal::BtnDanger);
-            return 0;
-        }
-        curr = pool[curr].children[idx];
-        highlightPath.push_back(curr);
-    }
-
-    if (pool[curr].isEnd){
-        SetMsg("Found!", Pal::BtnSuccess);
-        return 1;
-    }
-    else{
-        SetMsg("Prefix exists, but word not found", Pal::BtnOrange);
-        return 0;
-    }
 }
 
 void TrieScreen::OnLoadFileTriggered(const std::string& path) {
@@ -418,27 +415,32 @@ void TrieScreen::OnLoadFileTriggered(const std::string& path) {
 }
 
 void TrieScreen::Delete(const std::string& word) {
-    if (!InstantSearch(word)) return;
+    // Kiểm tra xem từ có tồn tại (ít nhất 1 instance) không
+    if (!InstantSearch(word)) return; 
+
     int cur = root;
     pool[cur].cnt--; 
+
     for (char c : word) {
         int idx = tolower(c) - 'a';
         int next = pool[cur].children[idx];
         
         pool[next].cnt--;
+        // Nếu không còn từ nào đi qua node này, ngắt kết nối
         if (pool[next].cnt <= 0) {
             pool[cur].children[idx] = -1;
         }
         cur = next;
     }
     
-    if (cur != -1) pool[cur].isEnd = false; 
-
+    if (cur != -1 && pool[cur].endCount > 0) {
+        pool[cur].endCount--; 
+    }
+    
     highlightPath.clear(); 
     Layout(); 
-    SetMsg("Word deleted!", Pal::BtnSuccess);
+    SetMsg("Word instance deleted!", Pal::BtnSuccess);
 }
-
 bool TrieScreen::IsValidChild(int parent, int charIdx) {
     int child = pool[parent].children[charIdx];
     return (child != -1 && pool[child].cnt > 0);
