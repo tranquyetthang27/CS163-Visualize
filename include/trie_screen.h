@@ -39,7 +39,7 @@ class TrieScreen {
     float stepTimer;
     bool isAnimating = false;
     bool isSearching = false;
-
+    bool isDeletingStep = false;
     void Layout();
     void LayoutSubtree(int node, float x, float y, float spread);
     int UpdateLeafCount(int node);

@@ -170,9 +170,17 @@ Screen TrieScreen::Update() {
     bool clickDelete = btnDelete.Update();
 
     if(clickDelete && !input.IsEmpty()){
-        std::string word;
-        for(char c: input.text)word += (char)tolower(c);
-        Delete(word);
+        std::string clean;
+        for(char c: input.text) if(isalpha(c)) clean += (char)tolower(c);
+        
+        if(!clean.empty()){
+            if (isStepByStep) {
+                isDeletingStep = true;
+                StartSearch(clean);
+            } else {
+                Delete(clean);
+            }
+        }
         input.Clear();
     }
     if (clickClear) {
@@ -361,7 +369,7 @@ bool TrieScreen::InstantSearch(const std::string& word) {
 
     for (char c : word) {
         int idx = tolower(c) - 'a';
-        if (pool[curr].children[idx] == -1) {
+        if (pool[curr].children[idx] == -1 || pool[pool[curr].children[idx]].cnt <= 0) {
             SetMsg("Not Found", Pal::BtnDanger);
             return 0;
         }
@@ -369,12 +377,14 @@ bool TrieScreen::InstantSearch(const std::string& word) {
         highlightPath.push_back(curr);
     }
 
-    if (pool[curr].isEnd) SetMsg("Found!", Pal::BtnSuccess);
+    if (pool[curr].isEnd){
+        SetMsg("Found!", Pal::BtnSuccess);
+        return 1;
+    }
     else{
         SetMsg("Prefix exists, but word not found", Pal::BtnOrange);
         return 0;
     }
-    return 1;
 }
 
 void TrieScreen::OnLoadFileTriggered(const std::string& path) {
@@ -395,21 +405,24 @@ void TrieScreen::OnLoadFileTriggered(const std::string& path) {
 }
 
 void TrieScreen::Delete(const std::string& word){
-    if(!TrieScreen::InstantSearch(word))return;
+    if(!InstantSearch(word)) return;
+    
     int cur = root;
+    pool[cur].cnt--;
     for(char c: word){
         int idx = tolower(c) - 'a';
         int nextnode = pool[cur].children[idx];
-        if(nextnode == -1)break;
-        pool[nextnode].cnt--;
+        if(nextnode == -1) break;
+        
+        pool[nextnode].cnt--; 
         if(pool[nextnode].cnt <= 0){
-            pool[cur].children[idx] = -1;
-            SetMsg("Deleted successfully!");
-            Layout();
+            pool[cur].children[idx] = -1; 
         }
         cur = nextnode;
     }
-    if(cur != -1)pool[cur].isEnd = false;
+    if(cur != -1) {
+        pool[cur].isEnd = false; 
+    }
     highlightPath.clear();
     SetMsg("Deleted successfully!");
     Layout();
