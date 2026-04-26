@@ -1,22 +1,15 @@
-a
-b
-c
-d
-e
-f
-g
-
-j
-k
-l
-q
-w
-e
-r
-t
-t
-y
-u
-i
-o
-o
+6 8
+A
+B
+C
+D
+E
+F
+A B 7
+A C 9
+A D 3
+B C 4
+B E 2
+C D 8
+D E 6
+E F 1

@@ -3,6 +3,23 @@
 #include <sstream>
 #include <algorithm>
 
+std::vector<std::string> InitFile::loadLines(const std::string& filePath) {
+    std::vector<std::string> result;
+    std::ifstream file(filePath);
+
+    if (!file.is_open()) {
+        return result;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        result.push_back(line);
+    }
+
+    file.close();
+    return result;
+}
+
 std::vector<std::string> InitFile::loadWords(const std::string& filePath) {
     std::vector<std::string> result;
     std::ifstream file(filePath);
