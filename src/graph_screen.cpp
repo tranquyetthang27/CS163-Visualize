@@ -20,9 +20,9 @@ constexpr int kMaxGraphN = 26;
 constexpr int kMaxGraphE = 50;
 
 constexpr Rectangle kInputPanel = {872, 86, 388, 516};
-constexpr Rectangle kInputContentArea = {884, 236, 360, 316};
-constexpr Rectangle kInputClip = {892, 270, 334, 266};
-constexpr Rectangle kScrollTrack = {1236, 244, 8, 292};
+constexpr Rectangle kInputContentArea = {884, 252, 360, 316};
+constexpr Rectangle kInputClip = {892, 286, 334, 266};
+constexpr Rectangle kScrollTrack = {1236, 260, 8, 292};
 
 // Edge List columns: No. | U (56px) | V (56px) | W (150px), 8px gaps
 constexpr float kEdgeListSttX = 896.0f;
@@ -30,18 +30,18 @@ constexpr float kEdgeListUX   = 922.0f;
 constexpr float kEdgeListVX   = 986.0f;
 constexpr float kEdgeListWX   = 1050.0f;
 constexpr float kEdgeListWeightW = 150.0f;
-constexpr float kEdgeListHeaderY = 271.0f;
-constexpr float kEdgeListRowY    = 293.0f;
+constexpr float kEdgeListHeaderY = 287.0f;
+constexpr float kEdgeListRowY    = 309.0f;
 constexpr float kEdgeListRowGap  = 22.0f;
 
 // Adjacency Matrix: 9 columns max, 30px per column
 constexpr float kMatrixColX  = 934.0f;
-constexpr float kMatrixRowY  = 293.0f;
+constexpr float kMatrixRowY  = 309.0f;
 constexpr float kMatrixGap   = 30.0f;
-constexpr float kMatrixHeaderY = 271.0f;
+constexpr float kMatrixHeaderY = 287.0f;
 
 // Adjacency List
-constexpr float kAdjRowY    = 275.0f;
+constexpr float kAdjRowY    = 291.0f;
 constexpr float kAdjRowGap  = 26.0f;
 
 constexpr Rectangle kTabEdge = {884, 128, 360, 34};
