@@ -20,9 +20,9 @@ constexpr int kMaxGraphN = 26;
 constexpr int kMaxGraphE = 50;
 
 constexpr Rectangle kInputPanel = {872, 86, 388, 516};
-constexpr Rectangle kInputContentArea = {884, 252, 360, 316};
-constexpr Rectangle kInputClip = {892, 286, 334, 266};
-constexpr Rectangle kScrollTrack = {1236, 260, 8, 292};
+constexpr Rectangle kInputContentArea = {884, 218, 360, 350};
+constexpr Rectangle kInputClip = {892, 252, 334, 300};
+constexpr Rectangle kScrollTrack = {1236, 226, 8, 326};
 
 // Edge List columns: No. | U (56px) | V (56px) | W (150px), 8px gaps
 constexpr float kEdgeListSttX = 896.0f;
@@ -30,23 +30,23 @@ constexpr float kEdgeListUX   = 922.0f;
 constexpr float kEdgeListVX   = 986.0f;
 constexpr float kEdgeListWX   = 1050.0f;
 constexpr float kEdgeListWeightW = 150.0f;
-constexpr float kEdgeListHeaderY = 287.0f;
-constexpr float kEdgeListRowY    = 309.0f;
+constexpr float kEdgeListHeaderY = 253.0f;
+constexpr float kEdgeListRowY    = 275.0f;
 constexpr float kEdgeListRowGap  = 22.0f;
 
 // Adjacency Matrix: 9 columns max, 30px per column
 constexpr float kMatrixColX  = 934.0f;
-constexpr float kMatrixRowY  = 309.0f;
+constexpr float kMatrixRowY  = 275.0f;
 constexpr float kMatrixGap   = 30.0f;
-constexpr float kMatrixHeaderY = 287.0f;
+constexpr float kMatrixHeaderY = 253.0f;
 
 // Adjacency List
-constexpr float kAdjRowY    = 291.0f;
+constexpr float kAdjRowY    = 257.0f;
 constexpr float kAdjRowGap  = 26.0f;
 
-constexpr Rectangle kTabEdge = {884, 128, 360, 34};
-constexpr Rectangle kTabMatrix = {884, 170, 360, 34};
-constexpr Rectangle kTabAdj = {884, 212, 360, 34};
+constexpr Rectangle kTabEdge = {884, 94, 360, 34};
+constexpr Rectangle kTabMatrix = {884, 136, 360, 34};
+constexpr Rectangle kTabAdj = {884, 178, 360, 34};
 
 bool ParseIntStrict(const std::string& text, int* value) {
     if (text.empty()) {
@@ -219,7 +219,6 @@ GraphScreen::GraphScreen()
         editField({360, 328, 560, 38}, "value", 24),
         editFromField({360, 410, 272, 38}, "from (node label/index)", 24),
         editToField({648, 410, 272, 38}, "to (node label/index)", 24),
-                filePathField({894, 92, 330, 24}, "data.txt", 160),
       msgTimer(0.0f),
       msgColor(Pal::TxtMid) {
     nodes[0] = {200, 200, "A", true};
@@ -264,8 +263,6 @@ GraphScreen::GraphScreen()
         adjListFields[i] = InputField({952.0f, y, 240.0f, 24.0f}, "neighbor,weight", 64);
     }
 
-    filePathField.text = "data.txt";
-
     SyncFieldsFromGraph();
     SetMsg("Choose an input format on the right.", Pal::TxtMid, 6.0f);
 }
@@ -285,7 +282,6 @@ void GraphScreen::ClearInputFocus() {
     editField.focused = false;
     editFromField.focused = false;
     editToField.focused = false;
-    filePathField.focused = false;
 }
 
 void GraphScreen::ClearSelection() {
@@ -701,9 +697,6 @@ Screen GraphScreen::Update() {
 
     Vector2 mouse = GetMousePosition();
     if (!editDialogOpen) {
-
-        filePathField.Update();
-
         if (CheckCollisionPointRec(mouse, tabEdge) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             SetInputMode(GraphInputMode::EdgeList);
         }
@@ -876,22 +869,7 @@ Screen GraphScreen::Update() {
             OpenAddEdgeDialog();
         }
         if (btnLoadFile.Update()) {
-            auto trim = [](const std::string& text) {
-                size_t begin = 0;
-                while (begin < text.size() && std::isspace(static_cast<unsigned char>(text[begin]))) {
-                    ++begin;
-                }
-                size_t end = text.size();
-                while (end > begin && std::isspace(static_cast<unsigned char>(text[end - 1]))) {
-                    --end;
-                }
-                return text.substr(begin, end - begin);
-            };
-
-            std::string path = trim(filePathField.text);
-            if (path.empty()) {
-                path = "data.txt";
-            }
+            std::string path = "data.txt";
             std::vector<std::string> lines = InitFile::loadLines(path);
             if (lines.empty()) {
                 SetMsg("Failed to open graph file or file is empty.", Pal::BtnDanger, 2.5f);
@@ -926,7 +904,6 @@ Screen GraphScreen::Update() {
             };
 
             for (std::string line : lines) {
-                line = trim(line);
                 if (line.empty()) {
                     continue;
                 }
@@ -1223,9 +1200,6 @@ void GraphScreen::Draw() const {
 
     DrawRectangleRec({872, 86, 388, 516}, Pal::Panel);
     DrawRectangleRoundedLines({872, 86, 388, 516}, 0.12f, 8, Pal::Border);
-
-    DrawTextEx(fontRegular, "File path", {896, 94}, 11.0f, 1.0f, Pal::TxtLight);
-    filePathField.Draw();
 
     DrawModeTab(kTabEdge, "Edge List", inputMode == GraphInputMode::EdgeList);
     DrawModeTab(kTabMatrix, "Adjacency Matrix", inputMode == GraphInputMode::AdjacencyMatrix);

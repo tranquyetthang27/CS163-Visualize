@@ -91,7 +91,6 @@ class GraphScreen {
     InputField editField;
     InputField editFromField;
     InputField editToField;
-    InputField filePathField;
 
     std::string message;
     float msgTimer;
