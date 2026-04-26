@@ -88,6 +88,23 @@ bool ParsePairToken(const std::string& token, int* neighbor, int* weight) {
     return ParseIntStrict(left, neighbor) && ParseIntStrict(right, weight);
 }
 
+std::string FormatVisitOrder(const std::vector<int>& order, const GNode* nodes, int nodeCount) {
+    std::string text;
+    for (int idx : order) {
+        if (idx < 0 || idx >= nodeCount || !nodes[idx].visible) {
+            continue;
+        }
+        if (!text.empty()) {
+            text += " -> ";
+        }
+        text += nodes[idx].label;
+    }
+    if (text.empty()) {
+        text = "-";
+    }
+    return text;
+}
+
 bool DrawModeTab(Rectangle rect, const char* label, bool active) {
     Vector2 mouse = GetMousePosition();
     bool hovered = CheckCollisionPointRec(mouse, rect);
@@ -1067,11 +1084,13 @@ Screen GraphScreen::Update() {
 
     if (btnKruskal.Update()) {
         mstSteps.clear();
+        mstVisitOrder.clear();
         mstActive = false;
         RunKruskal();
     }
     if (btnPrim.Update()) {
         mstSteps.clear();
+        mstVisitOrder.clear();
         mstActive = false;
         RunPrim();
     }
@@ -1084,9 +1103,13 @@ Screen GraphScreen::Update() {
                 mstStepTimer = 0.8f;
             } else {
                 int total = mstSteps.empty() ? 0 : mstSteps.back().cumulativeWeight;
-                char buf[64];
-                std::snprintf(buf, sizeof(buf), "Done! Total MST weight: %d", total);
-                SetMsg(buf, {46, 160, 67, 255}, 5.0f);
+                std::string orderText = FormatVisitOrder(mstVisitOrder, nodes, nodeCount);
+                std::string doneText = "Done! Total MST weight: " + std::to_string(total);
+                if (!orderText.empty() && orderText != "-") {
+                    doneText += " | ";
+                    doneText += orderText;
+                }
+                SetMsg(doneText.c_str(), {46, 160, 67, 255}, 5.0f);
             }
         }
     }
@@ -1188,12 +1211,14 @@ void GraphScreen::Draw() const {
     // MST sum box in graph area corner
     if (mstActive) {
         int currentSum = (mstCurrentStep > 0) ? mstSteps[mstCurrentStep - 1].cumulativeWeight : 0;
+        std::string orderText = FormatVisitOrder(mstVisitOrder, nodes, nodeCount);
         char sumBuf[32];
         std::snprintf(sumBuf, sizeof(sumBuf), "S = %d", currentSum);
-        DrawRectangleRounded({12, 552, 126, 48}, 0.18f, 6, Pal::Surface);
-        DrawRectangleRoundedLines({12, 552, 126, 48}, 0.18f, 6, Pal::Border);
-        DrawTextEx(fontRegular, "MST Weight", {20, 558}, 11.0f, 1.0f, Pal::TxtLight);
-        DrawTextEx(fontBold, sumBuf, {20, 574}, 19.0f, 1.0f, {46, 180, 90, 255});
+        DrawRectangleRounded({12, 542, 270, 58}, 0.18f, 6, Pal::Surface);
+        DrawRectangleRoundedLines({12, 542, 270, 58}, 0.18f, 6, Pal::Border);
+        DrawTextEx(fontRegular, "MST Weight", {20, 548}, 11.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, sumBuf, {20, 564}, 19.0f, 1.0f, {46, 180, 90, 255});
+        DrawTextEx(fontRegular, orderText.c_str(), {88, 566}, 12.0f, 1.0f, Pal::TxtDark);
     }
 
     DrawRectangleRec({872, 86, 388, 516}, Pal::Panel);
@@ -1322,6 +1347,8 @@ void GraphScreen::RunKruskal() {
         e.skipped = false;
     }
 
+    mstVisitOrder.clear();
+
     std::vector<int> order;
     for (int i = 0; i < (int)edges.size(); i++) {
         if (edges[i].visible) order.push_back(i);
@@ -1346,6 +1373,12 @@ void GraphScreen::RunKruskal() {
         if (added) {
             parent[pu] = pv;
             cumWeight += e.w;
+            if (std::find(mstVisitOrder.begin(), mstVisitOrder.end(), e.u) == mstVisitOrder.end()) {
+                mstVisitOrder.push_back(e.u);
+            }
+            if (std::find(mstVisitOrder.begin(), mstVisitOrder.end(), e.v) == mstVisitOrder.end()) {
+                mstVisitOrder.push_back(e.v);
+            }
         }
         mstSteps.push_back({idx, added, cumWeight});
     }
@@ -1365,6 +1398,8 @@ void GraphScreen::RunPrim() {
         e.skipped = false;
     }
 
+    mstVisitOrder.clear();
+
     int start = -1;
     for (int i = 0; i < nodeCount; i++) {
         if (nodes[i].visible) { start = i; break; }
@@ -1376,6 +1411,7 @@ void GraphScreen::RunPrim() {
 
     std::vector<bool> inTree(nodeCount, false);
     inTree[start] = true;
+    mstVisitOrder.push_back(start);
     int visibleCount = 0;
     for (int i = 0; i < nodeCount; i++) if (nodes[i].visible) visibleCount++;
 
@@ -1397,8 +1433,14 @@ void GraphScreen::RunPrim() {
             }
         }
         if (bestIdx == -1) break;
-        inTree[edges[bestIdx].u] = true;
-        inTree[edges[bestIdx].v] = true;
+        int u = edges[bestIdx].u;
+        int v = edges[bestIdx].v;
+        int nextNode = inTree[u] ? v : u;
+        inTree[u] = true;
+        inTree[v] = true;
+        if (nextNode >= 0 && nextNode < nodeCount) {
+            mstVisitOrder.push_back(nextNode);
+        }
         cumWeight += edges[bestIdx].w;
         mstSteps.push_back({bestIdx, true, cumWeight});
         added++;
