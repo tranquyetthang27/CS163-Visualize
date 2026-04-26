@@ -133,14 +133,15 @@ Screen TrieScreen::Update() {
                     highlightPath.push_back(currentNode);
                     currentIdx++;
                     Layout();
-                } else if (isSearching) {
-                    if (pool[currentNode].children[idx] != -1) {
+                }else if (isSearching) {
+                    if (pool[currentNode].children[idx] != -1 && pool[pool[currentNode].children[idx]].cnt > 0) {
                         currentNode = pool[currentNode].children[idx];
                         highlightPath.push_back(currentNode);
                         currentIdx++;
                     } else {
                         isSearching = false;
-                        SetMsg("Not Found", Pal::BtnDanger);
+                        SetMsg(isDeletingStep ? "Not found to delete" : "Not Found", Pal::BtnDanger);
+                        isDeletingStep = false;
                     }
                 }
             } else {
@@ -148,8 +149,17 @@ Screen TrieScreen::Update() {
                     pool[currentNode].isEnd = true;
                     SetMsg("Inserted successfully!");
                 } else if (isSearching) {
-                    if (pool[currentNode].isEnd) SetMsg("Found!", Pal::BtnSuccess);
-                    else SetMsg("Prefix exists, but word not found", Pal::BtnOrange);
+                    if (pool[currentNode].isEnd) {
+                        if (isDeletingStep) {
+                            Delete(pendingWord); 
+                            isDeletingStep = false; 
+                        } else {
+                            SetMsg("Found!", Pal::BtnSuccess);
+                        }
+                    } else {
+                        SetMsg(isDeletingStep ? "Not found to delete" : "Prefix exists, but word not found", Pal::BtnOrange);
+                        isDeletingStep = false;
+                    }
                 }
                 isAnimating = isSearching = false;
             }
@@ -191,7 +201,7 @@ Screen TrieScreen::Update() {
         pool[0].alpha = 1.0f;
         highlightPath.clear();
         input.Clear();
-        isAnimating = isSearching = false;
+        isAnimating = isSearching = isDeletingStep = false;
         SetMsg("Trie cleared.", Pal::BtnNeutral);
         return Screen::Trie;
     }
