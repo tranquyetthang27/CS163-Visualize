@@ -76,6 +76,7 @@ class GraphScreen {
     Button btnEditCancel;
     Button btnKruskal;
     Button btnPrim;
+    Button btnLoadFile;
     std::vector<MSTStep> mstSteps;
     int mstCurrentStep;
     bool mstActive;
@@ -89,6 +90,7 @@ class GraphScreen {
     InputField editField;
     InputField editFromField;
     InputField editToField;
+    InputField filePathField;
 
     std::string message;
     float msgTimer;

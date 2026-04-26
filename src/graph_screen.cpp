@@ -1,5 +1,6 @@
 #include "graph_screen.h"
 
+#include "init_file.h"
 #include "colors.h"
 #include "font.h"
 
@@ -10,6 +11,7 @@
 #include <functional>
 #include <numeric>
 #include <sstream>
+#include <unordered_map>
 
 namespace {
 
@@ -42,9 +44,9 @@ constexpr float kMatrixHeaderY = 271.0f;
 constexpr float kAdjRowY    = 275.0f;
 constexpr float kAdjRowGap  = 26.0f;
 
-constexpr Rectangle kTabEdge = {884, 106, 360, 34};
-constexpr Rectangle kTabMatrix = {884, 148, 360, 34};
-constexpr Rectangle kTabAdj = {884, 190, 360, 34};
+constexpr Rectangle kTabEdge = {884, 128, 360, 34};
+constexpr Rectangle kTabMatrix = {884, 170, 360, 34};
+constexpr Rectangle kTabAdj = {884, 212, 360, 34};
 
 bool ParseIntStrict(const std::string& text, int* value) {
     if (text.empty()) {
@@ -191,6 +193,7 @@ GraphScreen::GraphScreen()
         btnAddEdge({440, 642, 130, 40}, "Add Edge", Pal::BtnPrimary, Pal::BtnPrimHov),
     btnKruskal({580, 642, 130, 40}, "Kruskal", Pal::BtnSuccess, Pal::BtnSuccHov),
     btnPrim({720, 642, 130, 40}, "Prim", Pal::BtnPrimary, Pal::BtnPrimHov),
+            btnLoadFile({860, 642, 130, 40}, "Load File", Pal::BtnNeutral, Pal::BtnNeutHov),
       mstCurrentStep(0),
       mstActive(false),
       mstStepTimer(0.0f),
@@ -199,6 +202,7 @@ GraphScreen::GraphScreen()
         editField({360, 328, 560, 38}, "value", 24),
         editFromField({360, 410, 272, 38}, "from (node label/index)", 24),
         editToField({648, 410, 272, 38}, "to (node label/index)", 24),
+                filePathField({894, 92, 330, 24}, "data.txt", 160),
       msgTimer(0.0f),
       msgColor(Pal::TxtMid) {
     nodes[0] = {200, 200, "A", true};
@@ -243,6 +247,8 @@ GraphScreen::GraphScreen()
         adjListFields[i] = InputField({952.0f, y, 240.0f, 24.0f}, "neighbor,weight", 64);
     }
 
+    filePathField.text = "data.txt";
+
     SyncFieldsFromGraph();
     SetMsg("Choose an input format on the right.", Pal::TxtMid, 6.0f);
 }
@@ -262,6 +268,7 @@ void GraphScreen::ClearInputFocus() {
     editField.focused = false;
     editFromField.focused = false;
     editToField.focused = false;
+    filePathField.focused = false;
 }
 
 void GraphScreen::ClearSelection() {
@@ -678,6 +685,8 @@ Screen GraphScreen::Update() {
     Vector2 mouse = GetMousePosition();
     if (!editDialogOpen) {
 
+        filePathField.Update();
+
         if (CheckCollisionPointRec(mouse, tabEdge) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             SetInputMode(GraphInputMode::EdgeList);
         }
@@ -849,6 +858,181 @@ Screen GraphScreen::Update() {
         if (btnAddEdge.Update()) {
             OpenAddEdgeDialog();
         }
+        if (btnLoadFile.Update()) {
+            auto trim = [](const std::string& text) {
+                size_t begin = 0;
+                while (begin < text.size() && std::isspace(static_cast<unsigned char>(text[begin]))) {
+                    ++begin;
+                }
+                size_t end = text.size();
+                while (end > begin && std::isspace(static_cast<unsigned char>(text[end - 1]))) {
+                    --end;
+                }
+                return text.substr(begin, end - begin);
+            };
+
+            std::string path = trim(filePathField.text);
+            if (path.empty()) {
+                path = "data.txt";
+            }
+            std::vector<std::string> lines = InitFile::loadLines(path);
+            if (lines.empty()) {
+                SetMsg("Failed to open graph file or file is empty.", Pal::BtnDanger, 2.5f);
+                return Screen::MST;
+            }
+
+            struct LoadedEdge {
+                std::string u;
+                std::string v;
+                int w;
+            };
+
+            std::vector<std::string> labels;
+            std::unordered_map<std::string, int> labelToIndex;
+            std::vector<LoadedEdge> loadedEdges;
+
+            int expectedNodeCount = -1;
+            int expectedEdgeCount = -1;
+            int parsedNodeCount = 0;
+            int parsedEdgeCount = 0;
+            int stage = 0;  // 0 = header, 1 = labels, 2 = edges
+
+            auto ensureNode = [&](const std::string& label) {
+                auto it = labelToIndex.find(label);
+                if (it != labelToIndex.end()) {
+                    return it->second;
+                }
+                int idx = static_cast<int>(labels.size());
+                labels.push_back(label);
+                labelToIndex[label] = idx;
+                return idx;
+            };
+
+            for (std::string line : lines) {
+                line = trim(line);
+                if (line.empty()) {
+                    continue;
+                }
+
+                std::istringstream iss(line);
+                std::vector<std::string> tokens;
+                std::string token;
+                while (iss >> token) {
+                    tokens.push_back(token);
+                }
+
+                if (tokens.empty()) {
+                    continue;
+                }
+
+                if (stage == 0) {
+                    if (tokens.size() != 2 || !ParseIntStrict(tokens[0], &expectedNodeCount) || !ParseIntStrict(tokens[1], &expectedEdgeCount)) {
+                        SetMsg("First line must be: nodeCount edgeCount", Pal::BtnDanger, 2.5f);
+                        return Screen::MST;
+                    }
+                    if (expectedNodeCount <= 0 || expectedEdgeCount < 0) {
+                        SetMsg("Node/edge counts must be positive.", Pal::BtnDanger, 2.5f);
+                        return Screen::MST;
+                    }
+                    stage = 1;
+                    continue;
+                }
+
+                if (stage == 1) {
+                    if (tokens.size() != 1) {
+                        SetMsg("Vertex names must be one per line.", Pal::BtnDanger, 2.5f);
+                        return Screen::MST;
+                    }
+                    ensureNode(tokens[0]);
+                    parsedNodeCount++;
+                    if (parsedNodeCount >= expectedNodeCount) {
+                        stage = 2;
+                    }
+                    continue;
+                }
+
+                if (stage == 2) {
+                    if (tokens.size() != 3) {
+                        SetMsg("Each edge line must be: from to weight", Pal::BtnDanger, 2.5f);
+                        return Screen::MST;
+                    }
+
+                    int weight = 0;
+                    if (!ParseIntStrict(tokens[2], &weight)) {
+                        SetMsg("Edge weight must be numeric.", Pal::BtnDanger, 2.5f);
+                        return Screen::MST;
+                    }
+
+                    ensureNode(tokens[0]);
+                    ensureNode(tokens[1]);
+                    loadedEdges.push_back({tokens[0], tokens[1], weight});
+                    parsedEdgeCount++;
+                }
+            }
+
+            if (expectedNodeCount <= 0) {
+                SetMsg("Graph file does not contain a valid header.", Pal::BtnDanger, 2.5f);
+                return Screen::MST;
+            }
+
+            if (parsedNodeCount != expectedNodeCount) {
+                SetMsg("Not enough vertex names in the file.", Pal::BtnDanger, 2.5f);
+                return Screen::MST;
+            }
+
+            if (parsedEdgeCount != expectedEdgeCount) {
+                SetMsg("Not enough edge lines in the file.", Pal::BtnDanger, 2.5f);
+                return Screen::MST;
+            }
+
+            nodeCount = std::min(static_cast<int>(labels.size()), MAX_GRAPH_N);
+            for (int i = 0; i < nodeCount; i++) {
+                nodes[i].label = labels[i];
+                nodes[i].visible = true;
+            }
+            for (int i = nodeCount; i < MAX_GRAPH_N; i++) {
+                nodes[i].visible = false;
+            }
+
+            edges.clear();
+            for (const auto& edge : loadedEdges) {
+                auto itU = labelToIndex.find(edge.u);
+                auto itV = labelToIndex.find(edge.v);
+                if (itU == labelToIndex.end() || itV == labelToIndex.end()) {
+                    continue;
+                }
+                int u = itU->second;
+                int v = itV->second;
+                if (u < 0 || v < 0 || u >= nodeCount || v >= nodeCount || u == v) {
+                    continue;
+                }
+                edges.push_back({u, v, edge.w, true});
+            }
+
+            const float centerX = 430.0f;
+            const float centerY = 342.0f;
+            const float radiusX = 260.0f;
+            const float radiusY = 180.0f;
+            const float startAngle = -1.5707963f;
+            for (int i = 0; i < nodeCount; i++) {
+                float angle = startAngle + (2.0f * 3.1415926f * i) / std::max(nodeCount, 1);
+                nodes[i].x = centerX + std::cos(angle) * radiusX;
+                nodes[i].y = centerY + std::sin(angle) * radiusY;
+                nodes[i].visible = true;
+            }
+
+            mstSteps.clear();
+            mstActive = false;
+            mstCurrentStep = 0;
+            mstStepTimer = 0.0f;
+            ClearSelection();
+            ClearInputFocus();
+            SyncFieldsFromGraph(false);
+
+            char buf[128];
+            std::snprintf(buf, sizeof(buf), "Loaded %d nodes and %d edges from file.", nodeCount, static_cast<int>(edges.size()));
+            SetMsg(buf, Pal::BtnSuccess, 3.0f);
+        }
     } else {
         if (editTarget == GraphEditTarget::AddEdge && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             Vector2 mouse = GetMousePosition();
@@ -918,7 +1102,7 @@ void GraphScreen::Draw() const {
     DrawTextEx(fontBold, "Minimum Spanning Tree", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
     DrawTextEx(
         fontRegular,
-        "Left: graph preview. Right: choose input style (Edge List / Adjacency Matrix / Adjacency List).",
+        "Left: graph preview. Right: choose input style and load a graph file.",
         {130, 52},
         13.0f,
         1.0f,
@@ -1015,6 +1199,9 @@ void GraphScreen::Draw() const {
     DrawRectangleRec({872, 86, 388, 516}, Pal::Panel);
     DrawRectangleRoundedLines({872, 86, 388, 516}, 0.12f, 8, Pal::Border);
 
+    DrawTextEx(fontRegular, "File path", {896, 94}, 11.0f, 1.0f, Pal::TxtLight);
+    filePathField.Draw();
+
     DrawModeTab(kTabEdge, "Edge List", inputMode == GraphInputMode::EdgeList);
     DrawModeTab(kTabMatrix, "Adjacency Matrix", inputMode == GraphInputMode::AdjacencyMatrix);
     DrawModeTab(kTabAdj, "Adjacency List", inputMode == GraphInputMode::AdjacencyList);
@@ -1082,6 +1269,7 @@ void GraphScreen::Draw() const {
     btnAddEdge.Draw();
     btnKruskal.Draw();
     btnPrim.Draw();
+    btnLoadFile.Draw();
 
     if (mstActive) {
         char stepBuf[48];
@@ -1166,8 +1354,10 @@ void GraphScreen::RunKruskal() {
     mstActive = true;
     mstStepTimer = 0.8f;
     SetMsg("Kruskal: running step by step...", Pal::TxtMid, 3.0f);
-}
 
+
+
+}
 
 void GraphScreen::RunPrim() {
     for (auto& e : edges) {
@@ -1201,7 +1391,10 @@ void GraphScreen::RunPrim() {
             if (!e.visible || !nodes[e.u].visible || !nodes[e.v].visible) continue;
             bool uIn = inTree[e.u], vIn = inTree[e.v];
             if (uIn == vIn) continue;
-            if (e.w < bestW) { bestW = e.w; bestIdx = i; }
+            if (e.w < bestW) {
+                bestW = e.w;
+                bestIdx = i;
+            }
         }
         if (bestIdx == -1) break;
         inTree[edges[bestIdx].u] = true;
@@ -1216,4 +1409,3 @@ void GraphScreen::RunPrim() {
     mstStepTimer = 0.8f;
     SetMsg("Prim: running step by step...", Pal::TxtMid, 3.0f);
 }
-
