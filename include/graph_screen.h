@@ -78,6 +78,7 @@ class GraphScreen {
     Button btnPrim;
     Button btnLoadFile;
     std::vector<MSTStep> mstSteps;
+    std::vector<int> mstVisitOrder;
     int mstCurrentStep;
     bool mstActive;
     float mstStepTimer;
