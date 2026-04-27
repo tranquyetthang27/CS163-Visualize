@@ -403,7 +403,7 @@ void HeapScreen::Draw() const {
         float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
         Color c = msgColor; 
         c.a = (unsigned char)(alpha * 220);
-        DrawTextEx(fontRegular, message.c_str(), {900, 100}, 30.0f, 1.0f, c);
+        DrawTextEx(fontRegular, message.c_str(), {900, 100}, 25.0f, 1.0f, c);
     }
 
     // --- Stats ---
