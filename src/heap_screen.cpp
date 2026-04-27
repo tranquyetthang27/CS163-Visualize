@@ -140,6 +140,8 @@ Screen HeapScreen::Update() {
         if (doingInsert) {
             if (idCurrent == 0) {
                 doingInsert = false;
+                animA = animB = animC = -1;
+                ComputePositions();
                 char buf[32]; 
                 snprintf(buf, sizeof(buf), "Inserted %d.", heap[idCurrent]);
                 SetMsg(buf);
