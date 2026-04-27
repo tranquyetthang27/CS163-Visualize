@@ -11,6 +11,36 @@ static constexpr float TREE_TOP_Y = 130.0f;
 static constexpr float LEVEL_H    = 90.0f;
 static constexpr float HNODE_R    = 24.0f;
 
+static constexpr Rectangle kCodePanel   = {868.0f, 76.0f, 396.0f, 278.0f};
+static constexpr float     kCodeLineGap = 22.0f;
+
+static constexpr const char* kInsertCode[] = {
+    "heap.push_back(val);",
+    "int i = heap.size()-1;",
+    "while (i > 0) {",
+    "    int p = (i-1)/2;",
+    "    if (heap[i] > heap[p])",
+    "        swap(heap[i], heap[p]);",
+    "        i = p;",
+    "    else break;",
+    "}"
+};
+static constexpr int kInsertCodeN = 9;
+
+static constexpr const char* kDeleteCode[] = {
+    "heap[0] = heap.back();",
+    "heap.pop_back();",
+    "int i = 0;",
+    "while (true) {",
+    "    L=2*i+1; R=2*i+2;",
+    "    int max=i; check L, R;",
+    "    if (max == i) break;",
+    "    swap(heap[i], heap[max]);",
+    "    i = max;",
+    "}"
+};
+static constexpr int kDeleteCodeN = 10;
+
 HeapScreen::HeapScreen()
     : input({290, 636, 160, 40}, "Value...", 4),
       btnInsert({20, 636, 120, 40}, "Insert", Pal::BtnPrimary, Pal::BtnPrimHov),
@@ -18,23 +48,24 @@ HeapScreen::HeapScreen()
       btnBack({20, 20, 100, 36}, "< Back", Pal::BtnNeutral, Pal::BtnNeutHov),
       btnMode({620, 636, 140, 40}, "Mode: Step", Pal::BtnNeutral, Pal::BtnNeutHov),
       btnLoad({780, 636, 140, 40}, "Load File", Pal::BtnNeutral, Pal::BtnNeutHov),
-      msgTimer(0.0f), 
+      msgTimer(0.0f),
       msgColor(Pal::BtnSuccess),
-      animA(-1), 
-      animB(-1), 
-      animC(-1), 
-      idCurrent(0), 
-      stepTimer(0.0f), 
-      doingInsert(false), 
-      doingDelete(false), 
-      isHighlight(false), 
-      isStepByStep(true) 
+      animA(-1),
+      animB(-1),
+      animC(-1),
+      idCurrent(0),
+      stepTimer(0.0f),
+      doingInsert(false),
+      doingDelete(false),
+      isHighlight(false),
+      isStepByStep(true),
+      btnToggleCode({1120, 18, 140, 36}, "Show Code", Pal::BtnNeutral, Pal::BtnNeutHov),
+      showPseudoCode(false),
+      codeShowInsert(true)
 {}
 
-// ============================================================================
-// INTERNAL HELPERS & LOGIC
-// ============================================================================
 
+//internal helpers and logic
 void HeapScreen::InstantInsert() {
     int n = (int)heap.size() - 1;
     while (n && heap[n] > heap[(n - 1) / 2]) {
@@ -116,21 +147,18 @@ void HeapScreen::SetMsg(const char* msg, Color c, float dur) {
     msgTimer = dur;
 }
 
-// ============================================================================
-// CORE UPDATE
-// ============================================================================
-
+// core update
 Screen HeapScreen::Update() {
     float dt = GetFrameTime();
 
-    // --- 1. Animate nodes to target positions ---
+    // Animate nodes to target positions 
     for (auto& v : vis) {
         v.x     += (v.tx - v.x) * 10.0f * dt;
         v.y     += (v.ty - v.y) * 10.0f * dt;
         v.alpha += (1.0f - v.alpha) * 8.0f * dt;
     }
 
-    // --- 2. Handle step-by-step animations ---
+    // Handle step-by-step animations 
     if (doingInsert || doingDelete) {
         stepTimer += dt;
         if (stepTimer < 0.5f) return Screen::Heap;
@@ -216,10 +244,13 @@ Screen HeapScreen::Update() {
 
     if (msgTimer > 0) msgTimer -= dt;
 
+    btnToggleCode.label = showPseudoCode ? "Hide Code" : "Show Code";
+    if (btnToggleCode.Update()) showPseudoCode = !showPseudoCode;
+
     // Block interaction if animating
     if (doingInsert || doingDelete) return Screen::Heap;
 
-    // --- 3. Input & UI Handling ---
+    //  Input and UI Handling
     if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) return Screen::Home;
     
     bool doIns = false;
@@ -243,7 +274,7 @@ Screen HeapScreen::Update() {
         doDelMax = btnDelMax.Update();
     }
 
-    // --- 4. Process Insert / Delete actions ---
+    // Process Insert / Delete actions 
     if ((doIns && !input.IsEmpty()) || !loadQueue.empty()) {
         int v; 
         
@@ -263,6 +294,7 @@ Screen HeapScreen::Update() {
             SetMsg("Heap full (max 15)!", Pal::BtnDanger);
         } else {
             heap.push_back(v);
+            codeShowInsert = true;
             if (isStepByStep) {
                 // Heapify up
                 idCurrent = (int)heap.size() - 1;
@@ -275,6 +307,7 @@ Screen HeapScreen::Update() {
             input.Clear();
         }
     } else if (doDelMax && !heap.empty()) {
+        codeShowInsert = false;
         if (isStepByStep) {
             int maxVal = heap[0];
             heap[0] = heap.back();
@@ -291,7 +324,7 @@ Screen HeapScreen::Update() {
         }
     }
 
-    // --- 5. File Loading ---
+    //  File Loading 
     if (btnLoad.Update()) {
         std::string fullPath = std::string(PROJECT_ROOT_PATH) + "data.txt";
         std::vector<int> intList = InitFile::loadNumbers(fullPath);
@@ -313,19 +346,67 @@ Screen HeapScreen::Update() {
     return Screen::Heap;
 }
 
-// ============================================================================
-// RENDERING
-// ============================================================================
+// pseudo code
+
+int HeapScreen::GetPseudoCodeLine() const {
+    if (doingInsert) {
+        if (!isHighlight) return 4; // "if (heap[i] > heap[p])"
+        int p = (idCurrent - 1) / 2;
+        return (heap[idCurrent] > heap[p]) ? 5 : 7; // swap or break
+    }
+    if (doingDelete) {
+        if (!isHighlight) return 5; // "int max=i; check L, R;"
+        int n = (int)heap.size(), largest = idCurrent;
+        int l = 2 * idCurrent + 1, r = 2 * idCurrent + 2;
+        if (l < n && heap[l] > heap[largest]) largest = l;
+        if (r < n && heap[r] > heap[largest]) largest = r;
+        return (largest == idCurrent) ? 6 : 7;
+    }
+    return -1;
+}
+
+void HeapScreen::DrawCodePanel() const {
+    bool isInsert = doingInsert || (!doingDelete && codeShowInsert);
+    const char* const* code  = isInsert ? kInsertCode  : kDeleteCode;
+    int          count = isInsert ? kInsertCodeN  : kDeleteCodeN;
+    const char*  title = isInsert ? "Insert/ heapify up"
+                                  : "Delete Max/ heapify down";
+    int highlight = GetPseudoCodeLine();
+
+    DrawRectangleRounded(kCodePanel, 0.06f, 8, Color{20, 28, 50, 235});
+    DrawRectangleRoundedLines(kCodePanel, 0.06f, 8, Color{78, 93, 124, 255});
+    DrawTextEx(fontBold, title,
+               {kCodePanel.x + 12.0f, kCodePanel.y + 10.0f},
+               13.0f, 1.0f, Color{197, 209, 228, 255});
+
+    float baseY = kCodePanel.y + 36.0f;
+    for (int i = 0; i < count; i++) {
+        bool active = (i == highlight);
+        if (active) {
+            DrawRectangleRounded(
+                {kCodePanel.x + 8.0f, baseY + i * kCodeLineGap - 3.0f,
+                 kCodePanel.width - 16.0f, 20.0f},
+                0.12f, 6, Color{47, 88, 67, 235});
+        }
+        DrawTextEx(fontRegular, code[i],
+                   {kCodePanel.x + 16.0f, baseY + i * kCodeLineGap},
+                   12.5f, 1.0f,
+                   active ? Color{184, 250, 202, 255} : Color{166, 178, 203, 255});
+    }
+}
+
+// rendering
 
 void HeapScreen::Draw() const {
     ClearBackground(Pal::BG);
 
-    // --- Header ---
     DrawRectangleRec({0, 0, 1280, 72}, Pal::Surface);
     DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
     DrawTextEx(fontBold, "Max Heap", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
     DrawTextEx(fontRegular, "Insert values  |  Delete maximum", {130, 52}, 13.5f, 1.0f, Pal::TxtLight);
     btnBack.Draw();
+    btnToggleCode.Draw();
+    if (showPseudoCode) DrawCodePanel();
 
     int n = (int)heap.size();
 
@@ -333,7 +414,7 @@ void HeapScreen::Draw() const {
         DrawTextCentered(fontRegular, "Heap is empty — insert a value below", 360, 17.0f, Pal::TxtLight);
     }
 
-    // --- Draw tree edges ---
+    //  Draw tree edges
     for (int i = 0; i < n; i++) {
         int l = 2 * i + 1;
         int r = 2 * i + 2;
@@ -343,7 +424,7 @@ void HeapScreen::Draw() const {
         if (r < n) DrawLineEx({vi.x, vi.y}, {vis[r].x, vis[r].y}, 1.5f, Pal::EdgeColor);
     }
 
-    // --- Draw tree nodes ---
+    //Draw tree nodes 
     for (int i = 0; i < n; i++) {
         const auto& v = vis[i];
         
@@ -363,7 +444,7 @@ void HeapScreen::Draw() const {
         DrawTextEx(fontBold, buf, {v.x - ts.x / 2, v.y - ts.y / 2}, 16.0f, 1.0f, textC);
     }
 
-    // --- Array view (below tree) ---
+    //  Array view (below tree) 
     float arrayY = 540.0f;
     DrawTextEx(fontRegular, "Array:", {50, arrayY}, 14.0f, 1.0f, Pal::TxtMid);
     
@@ -388,7 +469,7 @@ void HeapScreen::Draw() const {
         DrawTextEx(fontRegular, idx, {cell.x + cell.width / 2 - ts.x / 2, arrayY + cellH - 2}, 11.0f, 1.0f, Pal::TxtLight);
     }
 
-    // --- Bottom panel ---
+    // Bottom panel 
     DrawRectangleRec({0, 616, 1280, 104}, Pal::Panel);
     DrawLineEx({0, 616}, {1280, 616}, 1.0f, Pal::Border);
     
@@ -398,15 +479,15 @@ void HeapScreen::Draw() const {
     btnMode.Draw();
     btnLoad.Draw();
     
-    // --- Message ---
+    // Message 
     if (msgTimer > 0 && !message.empty()) {
         float alpha = msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f;
         Color c = msgColor; 
         c.a = (unsigned char)(alpha * 220);
-        DrawTextEx(fontRegular, message.c_str(), {900, 100}, 25.0f, 1.0f, c);
+        DrawTextEx(fontRegular, message.c_str(), {20.0f, 686.0f}, 14.0f, 1.0f, c);
     }
 
-    // --- Stats ---
+    // Stats 
     char cnt[32]; 
     snprintf(cnt, sizeof(cnt), "Size: %d / %d", n, MAX_SIZE);
     DrawTextEx(fontRegular, cnt, {1150, 646}, 14.0f, 1.0f, Pal::TxtLight);
