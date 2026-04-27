@@ -37,9 +37,6 @@ enum class GraphSelectionType {
 };
 enum class GraphEditTarget {
     None,
-    NodeLabel,
-    EdgeWeight,
-    AddEdge,
     AddNodeLabel
 };
 
@@ -69,9 +66,8 @@ class GraphScreen {
 
     Button btnBack;
     Button btnDelete;
-    Button btnChange;
+    Button btnTableOk;
     Button btnAddNode;
-    Button btnAddEdge;
     Button btnEditOk;
     Button btnEditCancel;
     Button btnKruskal;
@@ -89,8 +85,6 @@ class GraphScreen {
     InputField matrixFields[MAX_GRAPH_N][MAX_GRAPH_N];
     InputField adjListFields[MAX_GRAPH_N];
     InputField editField;
-    InputField editFromField;
-    InputField editToField;
 
     std::string message;
     float msgTimer;
@@ -102,9 +96,7 @@ class GraphScreen {
     void SetIndexBase(int base);
     void SyncFieldsFromGraph(bool clearFocus = true);
     bool ApplyInputToGraph(bool showMessage);
-    void OpenChangeDialog();
     void OpenAddNodeDialog();
-    void OpenAddEdgeDialog();
     void ApplySelectedEdit();
     void DeleteSelected();
     void AddNodeAtRandom(const std::string& label);
