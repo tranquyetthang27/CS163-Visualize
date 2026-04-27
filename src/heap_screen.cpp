@@ -1,27 +1,15 @@
 #include "heap_screen.h"
-
-// --- System Includes ---
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <stdexcept>
-
-// --- Project Includes ---
 #include "colors.h"
 #include "font.h"
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
 
 static constexpr float TREE_CX    = 640.0f;
 static constexpr float TREE_TOP_Y = 130.0f;
 static constexpr float LEVEL_H    = 90.0f;
 static constexpr float HNODE_R    = 24.0f;
-
-// ============================================================================
-// CONSTRUCTOR
-// ============================================================================
 
 HeapScreen::HeapScreen()
     : input({290, 636, 160, 40}, "Value...", 4),

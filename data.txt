@@ -1,11 +1,8 @@
-A
-B
-C
-D
-E
-F
-AB
-CD
-ABC
-DD
-AABCDE
+123352 13533422
+12345
+421452
+1332256
+aaaabc
+avdvdes
+dvsae
+334562
