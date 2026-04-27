@@ -14,9 +14,6 @@ struct GNode {
 struct GEdge {
     int u, v, w;
     bool visible;
-    bool inMST;
-    bool skipped;   // would create cycle
-    bool highlighted;
 };
 
 struct MSTStep {
@@ -57,7 +54,6 @@ class GraphScreen {
     int nodeCount;
 
     GraphInputMode inputMode;
-    int indexBase;
 
     GraphSelectionType selectionType;
     int selectedIndex;
@@ -104,7 +100,6 @@ class GraphScreen {
     void ClearInputFocus();
     void ClearSelection();
     void SetInputMode(GraphInputMode mode);
-    void SetIndexBase(int base);
     void SyncFieldsFromGraph(bool clearFocus = true);
     bool ApplyInputToGraph(bool showMessage);
     void OpenAddNodeDialog();
