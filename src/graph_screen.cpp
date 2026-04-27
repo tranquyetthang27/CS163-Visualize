@@ -46,7 +46,7 @@ constexpr Rectangle kTabEdge   = {884, 94, 360, 34};
 constexpr Rectangle kTabMatrix = {884, 136, 360, 34};
 constexpr Rectangle kTabAdj    = {884, 178, 360, 34};
 constexpr Rectangle kCodePanel = {876, 86, 372, 166};
-constexpr float kMstStepDuration = 1.10f;
+constexpr float kMstStepDuration = 0.80f;
 
 constexpr const char* kKruskalPseudo[] = {
     "sort(edges.begin(), edges.end());",
@@ -75,9 +75,8 @@ bool ParseIntStrict(const std::string& text, int* value) {
     return true;
 }
 
-bool ParseNodeRef(const std::string& text, int indexBase, const GNode* nodes, int n, int* outIdx) {
+bool ParseNodeRef(const std::string& text, const GNode* nodes, int n, int* outIdx) {
     if (ParseIntStrict(text, outIdx)) {
-        *outIdx -= indexBase;
         return true;
     }
     for (int i = 0; i < n; i++) {
@@ -99,7 +98,7 @@ std::string FormatVisitOrder(const std::vector<int>& order, const GNode* nodes, 
     return text.empty() ? "-" : text;
 }
 
-bool DrawModeTab(Rectangle rect, const char* label, bool active) {
+void DrawModeTab(Rectangle rect, const char* label, bool active) {
     Vector2 mouse = GetMousePosition();
     bool hovered = CheckCollisionPointRec(mouse, rect);
 
@@ -115,7 +114,6 @@ bool DrawModeTab(Rectangle rect, const char* label, bool active) {
         {rect.x + rect.width * 0.5f - ts.x * 0.5f, rect.y + rect.height * 0.5f - ts.y * 0.5f}, 
         15.0f, 1.0f, active ? WHITE : Pal::TxtDark);
 
-    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
 void LayoutEdgeListFields(InputField* from, InputField* to, InputField* w, float scrollY, int count) {
@@ -163,7 +161,7 @@ float DistanceToSegment(Vector2 point, Vector2 a, Vector2 b) {
 // --- Class Implementation ---
 
 GraphScreen::GraphScreen()
-    : inputMode(GraphInputMode::EdgeList), indexBase(0), nodeCount(7),
+    : inputMode(GraphInputMode::EdgeList), nodeCount(7),
       selectionType(GraphSelectionType::None), selectedIndex(-1),
       editTarget(GraphEditTarget::None), editDialogOpen(false),
       draggingNodeIndex(-1), draggingOffset({0.0f, 0.0f}),
@@ -245,13 +243,6 @@ void GraphScreen::SetInputMode(GraphInputMode mode) {
     SyncFieldsFromGraph();
 }
 
-void GraphScreen::SetIndexBase(int base) {
-    if (indexBase == base) return;
-    indexBase = base;
-    inputScrollY = 0.0f;
-    SyncFieldsFromGraph();
-}
-
 void GraphScreen::SyncFieldsFromGraph(bool clearFocus) {
     if (clearFocus) ClearInputFocus();
 
@@ -317,7 +308,7 @@ bool GraphScreen::ApplyInputToGraph(bool showMessage) {
                 bool hasUnknownNodeRef = false;
 
                 auto resolveEndpoint = [&](const std::string& text, int oldNodeIdx, int* outIdx) {
-                    if (ParseNodeRef(text, indexBase, nodes, nodeCount, outIdx)) return true;
+                    if (ParseNodeRef(text, nodes, nodeCount, outIdx)) return true;
                     if (oldNodeIdx < 0 || oldNodeIdx >= nodeCount || text.empty()) {
                         hasUnknownNodeRef = true;
                         return false;
@@ -408,7 +399,7 @@ bool GraphScreen::ApplyInputToGraph(bool showMessage) {
                         return false;
                     }
                     int neighbor = 0, weight = 0;
-                    if (!ParseNodeRef(token.substr(0, sep), indexBase, nodes, nodeCount, &neighbor) ||
+                    if (!ParseNodeRef(token.substr(0, sep), nodes, nodeCount, &neighbor) ||
                         !ParseIntStrict(token.substr(sep + 1), &weight)) {
                         if (showMessage) SetMsg("Adjacency List: use label,weight (e.g. B,7).", Pal::BtnDanger, 2.5f);
                         return false;
@@ -1021,7 +1012,6 @@ void GraphScreen::DrawEditDialog() const {
 // ALGORITHMS
 // ============================================================================
 void GraphScreen::RunKruskal() {
-    for (auto& e : edges) { e.inMST = false; e.skipped = false; }
     mstVisitOrder.clear();
 
     std::vector<int> order;
@@ -1073,7 +1063,6 @@ void GraphScreen::RunKruskal() {
 }
 
 void GraphScreen::RunPrim() {
-    for (auto& e : edges) { e.inMST = false; e.skipped = false; }
     mstVisitOrder.clear();
 
     int start = -1, visibleCount = 0;
