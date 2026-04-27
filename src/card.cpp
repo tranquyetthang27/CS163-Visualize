@@ -35,9 +35,11 @@ void Card::Draw() const {
 
     // Clip header with rounded top corners
     DrawRectangleRounded(r, 0.08f, 8, accent);   // full card in accent color
+    
     // White lower portion
     Rectangle foot = {r.x, r.y + headerH, r.width, r.height - headerH};
     DrawRectangleRec(foot, Pal::Surface);
+    
     // Thin border
     Rectangle border = {r.x - 1, r.y - 1, r.width + 2, r.height + 2};
     DrawRectangleRounded(border, 0.08f, 8, Pal::Border);
@@ -65,8 +67,7 @@ void Card::Draw() const {
     }
 }
 
-//Illustration helpers
-
+// Illustration helpers
 static void DrawNode(float x, float y, float r, Color fill, Color border) {
     DrawCircleV({x, y}, r + 1.5f, border);
     DrawCircleV({x, y}, r,        fill);
@@ -99,6 +100,7 @@ void Card::DrawIllustration(Rectangle area) const {
             (unsigned char)(c0.a + (c1.a - c0.a) * f),
         };
     };
+    
     // Accent at full opacity for color mixing
     Color acc = {accent.r, accent.g, accent.b, 255};
     // Brightened accent blend accent toward white for the highlight
@@ -120,7 +122,6 @@ void Card::DrawIllustration(Rectangle area) const {
         // hover
         unsigned char bordA  = (unsigned char)(160 + 95 * a);
         Color cBord  = {255, 255, 255, bordA};
-        Color cDiv   = {255, 255, 255, bordA};
 
         //light
         for (int i = 0; i < NN - 1; i++) {
