@@ -103,16 +103,16 @@ Screen TrieScreen::Update() {
     }
 
     if (btnToggleMode.Update()) {
-    isStepByStep = !isStepByStep;
-    
-    if (isStepByStep) {
-        btnToggleMode.label = "Mode: Step";
-        btnToggleMode.baseColor = Pal::BtnNeutral; 
-    } else {
-        btnToggleMode.label = "Mode: Instant";
-        btnToggleMode.baseColor = Pal::BtnPrimary; 
+        isStepByStep = !isStepByStep;
+        
+        if (isStepByStep) {
+            btnToggleMode.label = "Mode: Step";
+            btnToggleMode.baseColor = Pal::BtnNeutral; 
+        } else {
+            btnToggleMode.label = "Mode: Instant";
+            btnToggleMode.baseColor = Pal::BtnPrimary; 
+        }
     }
-}
 
     if (isAnimating || isSearching) {
         stepTimer += dt;
@@ -151,6 +151,7 @@ Screen TrieScreen::Update() {
                 }
             } else { 
                 if (isAnimating) {
+                    highlightPath.clear();
                     pool[currentNode].endCount++;
                     SetMsg("Inserted successfully!");
                 } else if (isSearching) {
@@ -243,6 +244,10 @@ Screen TrieScreen::Update() {
 }
 
 void TrieScreen::StartInsert(const std::string& word) {
+    if(!isStepByStep){
+        InstantInsert(word);
+        return;
+    }
     pendingWord = word;
     currentIdx = 0;
     currentNode = root;
