@@ -107,6 +107,7 @@ void AudioSetMusicTrack(int idx) {
         "assets/music/music1.mp3",
         "assets/music/music2.mp3",
     };
+    
     if (idx >= 1 && idx <= 2) {
         // Build absolute path from executable directory so it works
         // regardless of the current working directory.
