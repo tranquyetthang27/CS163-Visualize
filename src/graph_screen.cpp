@@ -45,6 +45,25 @@ constexpr float kAdjRowGap = 26.0f;
 constexpr Rectangle kTabEdge   = {884, 94, 360, 34};
 constexpr Rectangle kTabMatrix = {884, 136, 360, 34};
 constexpr Rectangle kTabAdj    = {884, 178, 360, 34};
+constexpr Rectangle kCodePanel = {876, 86, 372, 166};
+constexpr float kMstStepDuration = 1.10f;
+
+constexpr const char* kKruskalPseudo[] = {
+    "sort(edges.begin(), edges.end());",
+    "for (edge e : edges) {",
+    "    if (find(e.u) != find(e.v)) {",
+    "        mst.push_back(e); union_set(e.u, e.v);",
+    "    } else mark_skipped(e);",
+    "}"
+};
+
+constexpr const char* kPrimPseudo[] = {
+    "visited[start] = true;",
+    "while (mst.size() < n - 1) {",
+    "    edge e = min_crossing_edge(visited);",
+    "    mst.push_back(e); visited[newNode] = true;",
+    "}"
+};
 
 // --- Parsers & Helpers ---
 bool ParseIntStrict(const std::string& text, int* value) {
@@ -156,7 +175,9 @@ GraphScreen::GraphScreen()
             btnKruskal({500, 642, 130, 40}, "Kruskal", Pal::BtnSuccess, Pal::BtnSuccHov),
             btnPrim({650, 642, 130, 40}, "Prim", Pal::BtnPrimary, Pal::BtnPrimHov),
             btnLoadFile({800, 642, 130, 40}, "Load File", Pal::BtnNeutral, Pal::BtnNeutHov),
+            btnToggleCode({1120, 18, 140, 36}, "Show Code", Pal::BtnNeutral, Pal::BtnNeutHov),
       mstCurrentStep(0), mstActive(false), mstStepTimer(0.0f),
+            showPseudoCode(false), mstAlgoType(MSTAlgorithmType::None),
       btnEditOk({360, 470, 272, 40}, "OK", Pal::BtnSuccess, Pal::BtnSuccHov),
       btnEditCancel({648, 470, 272, 40}, "Cancel", Pal::BtnNeutral, Pal::BtnNeutHov),
       editField({360, 328, 560, 38}, "value", 24),
@@ -517,6 +538,9 @@ Screen GraphScreen::Update() {
 
     if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) return Screen::Home;
 
+    btnToggleCode.label = showPseudoCode ? "Hide Code" : "Show Code";
+    if (btnToggleCode.Update()) showPseudoCode = !showPseudoCode;
+
     if (!editDialogOpen) {
         UpdateTabsAndScroll();
         UpdateInputFields();
@@ -692,12 +716,7 @@ void GraphScreen::UpdateMSTAnimation(float dt) {
         if (mstStepTimer <= 0.0f) {
             mstCurrentStep++;
             if (mstCurrentStep < (int)mstSteps.size()) {
-                mstStepTimer = 0.8f;
-            } else {
-                int total = mstSteps.empty() ? 0 : mstSteps.back().cumulativeWeight;
-                std::string orderText = FormatVisitOrder(mstVisitOrder, nodes, nodeCount);
-                std::string doneText = "Done! Total MST weight: " + std::to_string(total) + (orderText != "-" ? " | " + orderText : "");
-                SetMsg(doneText.c_str(), {46, 160, 67, 255}, 5.0f);
+                mstStepTimer = kMstStepDuration;
             }
         }
     }
@@ -788,6 +807,7 @@ void GraphScreen::Draw() const {
     DrawHeader();
     DrawGraphView();
     DrawInputPanel();
+    DrawPseudoCodePanel();
     DrawBottomArea();
     if (editDialogOpen) DrawEditDialog();
 }
@@ -798,13 +818,23 @@ void GraphScreen::DrawHeader() const {
     DrawTextEx(fontBold, "Minimum Spanning Tree", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
     DrawTextEx(fontRegular, "Left: graph preview. Right: choose input style and load a graph file.", {130, 52}, 13.0f, 1.0f, Pal::TxtLight);
     btnBack.Draw();
+    btnToggleCode.Draw();
     DrawLineEx({860, 72}, {860, 610}, 1.0f, Pal::Border);
 }
 
 void GraphScreen::DrawGraphView() const {
-    std::vector<int> edgeStepIdx(edges.size(), -2);
+    std::vector<int> edgeState(edges.size(), 0); // 0: untouched, 1: added, -1: skipped
+    int currentEdge = -1;
     if (mstActive) {
-        for (int s = 0; s < (int)mstSteps.size(); s++) edgeStepIdx[mstSteps[s].edgeIdx] = s;
+        for (int s = 0; s < mstCurrentStep && s < (int)mstSteps.size(); s++) {
+            const MSTStep& step = mstSteps[s];
+            if (step.edgeIdx >= 0 && step.edgeIdx < (int)edges.size() && step.marksDecision) {
+                edgeState[step.edgeIdx] = step.added ? 1 : -1;
+            }
+        }
+        if (mstCurrentStep >= 0 && mstCurrentStep < (int)mstSteps.size()) {
+            currentEdge = mstSteps[mstCurrentStep].edgeIdx;
+        }
     }
 
     // Draw Edges
@@ -819,11 +849,13 @@ void GraphScreen::DrawGraphView() const {
         bool isNext = false;
 
         if (mstActive) {
-            int s = edgeStepIdx[i];
-            if (s >= 0 && s < mstCurrentStep) {
-                lineColor = mstSteps[s].added ? Color{46, 180, 90, 255} : Color{160, 60, 60, 180};
-                lineW = mstSteps[s].added ? 3.6f : 1.4f;
-            } else if (s == mstCurrentStep) {
+            if (edgeState[i] == 1) {
+                lineColor = Color{46, 180, 90, 255};
+                lineW = 3.6f;
+            } else if (edgeState[i] == -1) {
+                lineColor = Color{160, 60, 60, 180};
+                lineW = 1.4f;
+            } else if (i == currentEdge) {
                 lineColor = {255, 200, 50, 255}; lineW = 3.0f; isNext = true;
             } else {
                 lineColor = {100, 110, 140, 120}; lineW = 1.4f;
@@ -859,6 +891,45 @@ void GraphScreen::DrawGraphView() const {
         DrawTextEx(fontRegular, "MST Weight", {20, 548}, 11.0f, 1.0f, Pal::TxtLight);
         DrawTextEx(fontBold, sumBuf, {20, 564}, 19.0f, 1.0f, {46, 180, 90, 255});
         DrawTextEx(fontRegular, FormatVisitOrder(mstVisitOrder, nodes, nodeCount).c_str(), {88, 566}, 12.0f, 1.0f, Pal::TxtDark);
+    }
+
+}
+
+int GraphScreen::GetPseudoCodeHighlightLine() const {
+    if (mstAlgoType == MSTAlgorithmType::None) return -1;
+
+    if (mstSteps.empty()) return 0;
+    if (!mstActive) return mstSteps[0].pseudoLine;
+
+    int idx = std::clamp(mstCurrentStep, 0, (int)mstSteps.size() - 1);
+    return mstSteps[idx].pseudoLine;
+}
+
+void GraphScreen::DrawPseudoCodePanel() const {
+    if (!showPseudoCode || mstAlgoType == MSTAlgorithmType::None) return;
+
+    DrawRectangleRounded(kCodePanel, 0.06f, 8, Color{34, 43, 67, 255});
+    DrawRectangleRoundedLines(kCodePanel, 0.06f, 8, Color{78, 93, 124, 255});
+
+    const bool isKruskal = (mstAlgoType == MSTAlgorithmType::Kruskal);
+    const char* title = isKruskal ? "Kruskal" : "Prim";
+    DrawTextEx(fontBold, title, {kCodePanel.x + 12.0f, kCodePanel.y + 10.0f}, 14.0f, 1.0f, Color{197, 209, 228, 255});
+
+    const int highlightLine = GetPseudoCodeHighlightLine();
+    const int lineCount = isKruskal ? 6 : 5;
+    const float baseY = kCodePanel.y + 36.0f;
+    const float lineGap = 24.0f;
+
+    for (int i = 0; i < lineCount; i++) {
+        const char* lineText = isKruskal ? kKruskalPseudo[i] : kPrimPseudo[i];
+        const bool active = (i == highlightLine);
+        if (active) {
+            DrawRectangleRounded(
+                {kCodePanel.x + 8.0f, baseY + i * lineGap - 3.0f, kCodePanel.width - 16.0f, 22.0f},
+                0.12f, 6, Color{47, 88, 67, 235});
+        }
+        DrawTextEx(fontRegular, lineText, {kCodePanel.x + 16.0f, baseY + i * lineGap}, 13.0f, 1.0f,
+            active ? Color{184, 250, 202, 255} : Color{166, 178, 203, 255});
     }
 }
 
@@ -963,21 +1034,41 @@ void GraphScreen::RunKruskal() {
 
     mstSteps.clear();
     int cumWeight = 0;
+
+    // Line 1: sort edges
+    mstSteps.push_back({-1, false, cumWeight, 0, false});
+
     for (int idx : order) {
         const GEdge& e = edges[idx];
         if (!nodes[e.u].visible || !nodes[e.v].visible) continue;
+
+        // Line 2: for each edge
+        mstSteps.push_back({idx, false, cumWeight, 1, false});
+
         int pu = find(e.u), pv = find(e.v);
+
+        // Line 3: check set condition
+        mstSteps.push_back({idx, false, cumWeight, 2, false});
+
         bool added = (pu != pv);
         if (added) {
             parent[pu] = pv;
             cumWeight += e.w;
             if (std::find(mstVisitOrder.begin(), mstVisitOrder.end(), e.u) == mstVisitOrder.end()) mstVisitOrder.push_back(e.u);
             if (std::find(mstVisitOrder.begin(), mstVisitOrder.end(), e.v) == mstVisitOrder.end()) mstVisitOrder.push_back(e.v);
+            // Line 4: add + union
+            mstSteps.push_back({idx, true, cumWeight, 3, true});
+        } else {
+            // Line 5: skip edge
+            mstSteps.push_back({idx, false, cumWeight, 4, true});
         }
-        mstSteps.push_back({idx, added, cumWeight});
     }
 
-    mstCurrentStep = 0; mstActive = true; mstStepTimer = 0.8f;
+    // Line 6: stop condition reached
+    mstSteps.push_back({-1, false, cumWeight, 5, false});
+
+    mstCurrentStep = 0; mstActive = true; mstStepTimer = kMstStepDuration;
+    mstAlgoType = MSTAlgorithmType::Kruskal;
     SetMsg("Kruskal: running step by step...", Pal::TxtMid, 3.0f);
 }
 
@@ -991,18 +1082,31 @@ void GraphScreen::RunPrim() {
     }
     if (start == -1) { SetMsg("No visible nodes.", {200, 60, 60, 255}, 3.0f); return; }
 
+    mstAlgoType = MSTAlgorithmType::Prim;
+
     std::vector<bool> inTree(nodeCount, false);
     inTree[start] = true;
     mstVisitOrder.push_back(start);
     mstSteps.clear();
 
     int cumWeight = 0, added = 0;
+
+    // Line 1: initialize start node
+    mstSteps.push_back({-1, false, cumWeight, 0, false});
+
     while (added < visibleCount - 1) {
+        // Line 2: loop condition
+        mstSteps.push_back({-1, false, cumWeight, 1, false});
+
         int bestIdx = -1, bestW = INT_MAX;
         for (int i = 0; i < (int)edges.size(); i++) {
             const GEdge& e = edges[i];
             if (!e.visible || !nodes[e.u].visible || !nodes[e.v].visible || inTree[e.u] == inTree[e.v]) continue;
             if (e.w < bestW) { bestW = e.w; bestIdx = i; }
+        }
+        if (bestIdx >= 0) {
+            // Line 3: pick minimum crossing edge
+            mstSteps.push_back({bestIdx, false, cumWeight, 2, false});
         }
         if (bestIdx == -1) break;
 
@@ -1012,10 +1116,14 @@ void GraphScreen::RunPrim() {
         if (nextNode >= 0 && nextNode < nodeCount) mstVisitOrder.push_back(nextNode);
 
         cumWeight += edges[bestIdx].w;
-        mstSteps.push_back({bestIdx, true, cumWeight});
+        // Line 4: add edge and mark visited
+        mstSteps.push_back({bestIdx, true, cumWeight, 3, true});
         added++;
     }
 
-    mstCurrentStep = 0; mstActive = true; mstStepTimer = 0.8f;
+    // Line 5: loop finished
+    mstSteps.push_back({-1, false, cumWeight, 4, false});
+
+    mstCurrentStep = 0; mstActive = true; mstStepTimer = kMstStepDuration;
     SetMsg("Prim: running step by step...", Pal::TxtMid, 3.0f);
 }

@@ -23,6 +23,8 @@ struct MSTStep {
     int edgeIdx;
     bool added;
     int cumulativeWeight;
+    int pseudoLine;
+    bool marksDecision;
 };
 
 enum class GraphInputMode {
@@ -38,6 +40,12 @@ enum class GraphSelectionType {
 enum class GraphEditTarget {
     None,
     AddNodeLabel
+};
+
+enum class MSTAlgorithmType {
+    None,
+    Kruskal,
+    Prim
 };
 
 class GraphScreen {
@@ -73,11 +81,14 @@ class GraphScreen {
     Button btnKruskal;
     Button btnPrim;
     Button btnLoadFile;
+    Button btnToggleCode;
     std::vector<MSTStep> mstSteps;
     std::vector<int> mstVisitOrder;
     int mstCurrentStep;
     bool mstActive;
     float mstStepTimer;
+    bool showPseudoCode;
+    MSTAlgorithmType mstAlgoType;
 
     InputField edgeFromFields[MAX_GRAPH_E];
     InputField edgeToFields[MAX_GRAPH_E];
@@ -129,5 +140,7 @@ private:
     void DrawInputPanel() const;
     void DrawBottomArea() const;
     void DrawEditDialog() const;
+    void DrawPseudoCodePanel() const;
+    int GetPseudoCodeHighlightLine() const;
 
 };
