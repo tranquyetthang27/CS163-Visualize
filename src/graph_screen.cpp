@@ -1,11 +1,11 @@
 #include "graph_screen.h"
-
 #include "init_file.h"
 #include "colors.h"
 #include "font.h"
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
@@ -15,58 +15,50 @@
 
 namespace {
 
+// --- Constants ---
 constexpr float kNodeRadius = 22.0f;
 constexpr int kMaxGraphN = 26;
 constexpr int kMaxGraphE = 50;
 
-constexpr Rectangle kInputPanel = {872, 86, 388, 516};
+constexpr Rectangle kInputPanel       = {872, 86, 388, 516};
 constexpr Rectangle kInputContentArea = {884, 218, 360, 350};
-constexpr Rectangle kInputClip = {892, 252, 334, 300};
-constexpr Rectangle kScrollTrack = {1236, 226, 8, 326};
+constexpr Rectangle kInputClip        = {892, 252, 334, 300};
+constexpr Rectangle kScrollTrack      = {1236, 226, 8, 326};
 
-// Edge List columns: No. | U (56px) | V (56px) | W (150px), 8px gaps
-constexpr float kEdgeListSttX = 896.0f;
-constexpr float kEdgeListUX   = 922.0f;
-constexpr float kEdgeListVX   = 986.0f;
-constexpr float kEdgeListWX   = 1050.0f;
+constexpr float kEdgeListSttX    = 896.0f;
+constexpr float kEdgeListUX      = 922.0f;
+constexpr float kEdgeListVX      = 986.0f;
+constexpr float kEdgeListWX      = 1050.0f;
 constexpr float kEdgeListWeightW = 150.0f;
 constexpr float kEdgeListHeaderY = 253.0f;
 constexpr float kEdgeListRowY    = 275.0f;
 constexpr float kEdgeListRowGap  = 22.0f;
 
-// Adjacency Matrix: 9 columns max, 30px per column
-constexpr float kMatrixColX  = 934.0f;
-constexpr float kMatrixRowY  = 275.0f;
-constexpr float kMatrixGap   = 30.0f;
+constexpr float kMatrixColX    = 934.0f;
+constexpr float kMatrixRowY    = 275.0f;
+constexpr float kMatrixGap     = 30.0f;
 constexpr float kMatrixHeaderY = 253.0f;
 
-// Adjacency List
-constexpr float kAdjRowY    = 257.0f;
-constexpr float kAdjRowGap  = 26.0f;
+constexpr float kAdjRowY   = 257.0f;
+constexpr float kAdjRowGap = 26.0f;
 
-constexpr Rectangle kTabEdge = {884, 94, 360, 34};
+constexpr Rectangle kTabEdge   = {884, 94, 360, 34};
 constexpr Rectangle kTabMatrix = {884, 136, 360, 34};
-constexpr Rectangle kTabAdj = {884, 178, 360, 34};
+constexpr Rectangle kTabAdj    = {884, 178, 360, 34};
 
+// --- Parsers & Helpers ---
 bool ParseIntStrict(const std::string& text, int* value) {
-    if (text.empty()) {
-        return false;
-    }
+    if (text.empty()) return false;
     char* end = nullptr;
     long parsed = std::strtol(text.c_str(), &end, 10);
-    if (end == text.c_str() || *end != '\0') {
-        return false;
-    }
+    if (end == text.c_str() || *end != '\0') return false;
     *value = static_cast<int>(parsed);
     return true;
 }
 
-// Accepts either a numeric index (adjusted by indexBase) or a node label string.
-bool ParseNodeRef(const std::string& text, int indexBase,
-                  const GNode* nodes, int n, int* outIdx) {
-    int idx;
-    if (ParseIntStrict(text, &idx)) {
-        *outIdx = idx - indexBase;
+bool ParseNodeRef(const std::string& text, int indexBase, const GNode* nodes, int n, int* outIdx) {
+    if (ParseIntStrict(text, outIdx)) {
+        *outIdx -= indexBase;
         return true;
     }
     for (int i = 0; i < n; i++) {
@@ -78,31 +70,14 @@ bool ParseNodeRef(const std::string& text, int indexBase,
     return false;
 }
 
-bool ParsePairToken(const std::string& token, int* neighbor, int* weight) {
-    size_t pos = token.find_first_of(",:/-");
-    if (pos == std::string::npos || pos == 0 || pos + 1 >= token.size()) {
-        return false;
-    }
-    std::string left = token.substr(0, pos);
-    std::string right = token.substr(pos + 1);
-    return ParseIntStrict(left, neighbor) && ParseIntStrict(right, weight);
-}
-
 std::string FormatVisitOrder(const std::vector<int>& order, const GNode* nodes, int nodeCount) {
     std::string text;
     for (int idx : order) {
-        if (idx < 0 || idx >= nodeCount || !nodes[idx].visible) {
-            continue;
-        }
-        if (!text.empty()) {
-            text += " -> ";
-        }
+        if (idx < 0 || idx >= nodeCount || !nodes[idx].visible) continue;
+        if (!text.empty()) text += " -> ";
         text += nodes[idx].label;
     }
-    if (text.empty()) {
-        text = "-";
-    }
-    return text;
+    return text.empty() ? "-" : text;
 }
 
 bool DrawModeTab(Rectangle rect, const char* label, bool active) {
@@ -110,34 +85,26 @@ bool DrawModeTab(Rectangle rect, const char* label, bool active) {
     bool hovered = CheckCollisionPointRec(mouse, rect);
 
     Color fill = active ? Pal::BtnPrimary : Pal::Surface;
-    if (hovered && !active) {
-        fill = Pal::PanelDark;
-    } else if (hovered && active) {
-        fill = Pal::BtnPrimHov;
-    }
+    if (hovered && !active) fill = Pal::PanelDark;
+    else if (hovered && active) fill = Pal::BtnPrimHov;
 
     DrawRectangleRounded(rect, 0.22f, 8, fill);
     DrawRectangleRoundedLines(rect, 0.22f, 8, active ? Pal::BtnPrimary : Pal::Border);
 
     Vector2 ts = MeasureTextEx(fontBold, label, 15.0f, 1.0f);
-    DrawTextEx(
-        fontBold,
-        label,
-        {rect.x + rect.width * 0.5f - ts.x * 0.5f, rect.y + rect.height * 0.5f - ts.y * 0.5f},
-        15.0f,
-        1.0f,
-        active ? WHITE : Pal::TxtDark
-    );
+    DrawTextEx(fontBold, label, 
+        {rect.x + rect.width * 0.5f - ts.x * 0.5f, rect.y + rect.height * 0.5f - ts.y * 0.5f}, 
+        15.0f, 1.0f, active ? WHITE : Pal::TxtDark);
 
     return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
-void LayoutEdgeListFields(InputField* fromFields, InputField* toFields, InputField* weightFields, float scrollY, int count) {
+void LayoutEdgeListFields(InputField* from, InputField* to, InputField* w, float scrollY, int count) {
     for (int i = 0; i < count; i++) {
         float y = kEdgeListRowY + i * kEdgeListRowGap - scrollY;
-        fromFields[i].rect = {kEdgeListUX, y, 56.0f, 20.0f};
-        toFields[i].rect   = {kEdgeListVX, y, 56.0f, 20.0f};
-        weightFields[i].rect = {kEdgeListWX, y, kEdgeListWeightW, 20.0f};
+        from[i].rect = {kEdgeListUX, y, 56.0f, 20.0f};
+        to[i].rect   = {kEdgeListVX, y, 56.0f, 20.0f};
+        w[i].rect    = {kEdgeListWX, y, kEdgeListWeightW, 20.0f};
     }
 }
 
@@ -158,69 +125,47 @@ void LayoutAdjListFields(InputField* fields, float scrollY, int n) {
     }
 }
 
-void DrawFixedHeader(const char* title, const char* hint) {
-    DrawTextEx(fontBold, title, {902, 292}, 18.0f, 1.0f, Pal::TxtDark);
-    DrawTextEx(fontRegular, hint, {902, 312}, 12.4f, 1.0f, Pal::TxtLight);
-}
-
 float DistanceToSegment(Vector2 point, Vector2 a, Vector2 b) {
     Vector2 ab = {b.x - a.x, b.y - a.y};
     Vector2 ap = {point.x - a.x, point.y - a.y};
     float ab2 = ab.x * ab.x + ab.y * ab.y;
+    
     if (ab2 <= 0.0001f) {
-        float dx = point.x - a.x;
-        float dy = point.y - a.y;
-        return std::sqrt(dx * dx + dy * dy);
+        return std::sqrt(std::pow(point.x - a.x, 2) + std::pow(point.y - a.y, 2));
     }
 
-    float t = (ap.x * ab.x + ap.y * ab.y) / ab2;
-    if (t < 0.0f) t = 0.0f;
-    if (t > 1.0f) t = 1.0f;
-
+    float t = std::clamp((ap.x * ab.x + ap.y * ab.y) / ab2, 0.0f, 1.0f);
     Vector2 c = {a.x + ab.x * t, a.y + ab.y * t};
-    float dx = point.x - c.x;
-    float dy = point.y - c.y;
-    return std::sqrt(dx * dx + dy * dy);
-}
-
-void DrawSectionHeader(const char* title, const char* hint, float x, float y) {
-    DrawTextEx(fontBold, title, {x, y}, 18.0f, 1.0f, Pal::TxtDark);
-    DrawTextEx(fontRegular, hint, {x, y + 20.0f}, 12.4f, 1.0f, Pal::TxtLight);
+    return std::sqrt(std::pow(point.x - c.x, 2) + std::pow(point.y - c.y, 2));
 }
 
 }  // namespace
 
+// --- Class Implementation ---
+
 GraphScreen::GraphScreen()
-    : inputMode(GraphInputMode::EdgeList),
-      indexBase(0),
-      nodeCount(7),
-      selectionType(GraphSelectionType::None),
-      selectedIndex(-1),
-            editTarget(GraphEditTarget::None),
-            editDialogOpen(false),
-                        draggingNodeIndex(-1),
-                        draggingOffset({0.0f, 0.0f}),
-            inputScrollY(0.0f),
-            inputScrollDragging(false),
-            inputScrollDragOffset(0.0f),
+    : inputMode(GraphInputMode::EdgeList), indexBase(0), nodeCount(7),
+      selectionType(GraphSelectionType::None), selectedIndex(-1),
+      editTarget(GraphEditTarget::None), editDialogOpen(false),
+      draggingNodeIndex(-1), draggingOffset({0.0f, 0.0f}),
+      inputScrollY(0.0f), inputScrollDragging(false), inputScrollDragOffset(0.0f),
       btnBack({20, 20, 100, 36}, "< Back", Pal::BtnNeutral, Pal::BtnNeutHov),
-    btnDelete({20, 642, 130, 40}, "Delete", Pal::BtnDanger, Pal::BtnDangHov),
-        btnChange({160, 642, 130, 40}, "Change", Pal::BtnNeutral, Pal::BtnNeutHov),
-    btnAddNode({300, 642, 130, 40}, "Add Node", Pal::BtnSuccess, Pal::BtnSuccHov),
-        btnAddEdge({440, 642, 130, 40}, "Add Edge", Pal::BtnPrimary, Pal::BtnPrimHov),
-    btnKruskal({580, 642, 130, 40}, "Kruskal", Pal::BtnSuccess, Pal::BtnSuccHov),
-    btnPrim({720, 642, 130, 40}, "Prim", Pal::BtnPrimary, Pal::BtnPrimHov),
-            btnLoadFile({860, 642, 130, 40}, "Load File", Pal::BtnNeutral, Pal::BtnNeutHov),
-      mstCurrentStep(0),
-      mstActive(false),
-      mstStepTimer(0.0f),
-        btnEditOk({360, 470, 272, 40}, "OK", Pal::BtnSuccess, Pal::BtnSuccHov),
-        btnEditCancel({648, 470, 272, 40}, "Cancel", Pal::BtnNeutral, Pal::BtnNeutHov),
-        editField({360, 328, 560, 38}, "value", 24),
-        editFromField({360, 410, 272, 38}, "from (node label/index)", 24),
-        editToField({648, 410, 272, 38}, "to (node label/index)", 24),
-      msgTimer(0.0f),
-      msgColor(Pal::TxtMid) {
+      btnDelete({20, 642, 130, 40}, "Delete", Pal::BtnDanger, Pal::BtnDangHov),
+      btnChange({160, 642, 130, 40}, "Change", Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnAddNode({300, 642, 130, 40}, "Add Node", Pal::BtnSuccess, Pal::BtnSuccHov),
+      btnAddEdge({440, 642, 130, 40}, "Add Edge", Pal::BtnPrimary, Pal::BtnPrimHov),
+      btnKruskal({580, 642, 130, 40}, "Kruskal", Pal::BtnSuccess, Pal::BtnSuccHov),
+      btnPrim({720, 642, 130, 40}, "Prim", Pal::BtnPrimary, Pal::BtnPrimHov),
+      btnLoadFile({860, 642, 130, 40}, "Load File", Pal::BtnNeutral, Pal::BtnNeutHov),
+      mstCurrentStep(0), mstActive(false), mstStepTimer(0.0f),
+      btnEditOk({360, 470, 272, 40}, "OK", Pal::BtnSuccess, Pal::BtnSuccHov),
+      btnEditCancel({648, 470, 272, 40}, "Cancel", Pal::BtnNeutral, Pal::BtnNeutHov),
+      editField({360, 328, 560, 38}, "value", 24),
+      editFromField({360, 410, 272, 38}, "from (node label/index)", 24),
+      editToField({648, 410, 272, 38}, "to (node label/index)", 24),
+      msgTimer(0.0f), msgColor(Pal::TxtMid) 
+{
+    // Initialize sample graph
     nodes[0] = {200, 200, "A", true};
     nodes[1] = {450, 140, "B", true};
     nodes[2] = {700, 200, "C", true};
@@ -230,37 +175,28 @@ GraphScreen::GraphScreen()
     nodes[6] = {130, 370, "G", true};
 
     edges = {
-        {0, 1, 7, true},
-        {0, 5, 9, true},
-        {0, 6, 14, true},
-        {1, 2, 8, true},
-        {1, 5, 10, true},
-        {2, 3, 7, true},
-        {2, 4, 2, true},
-        {3, 4, 6, true},
-        {4, 5, 11, true},
-        {5, 6, 2, true},
-        {3, 6, 9, true}
+        {0, 1, 7, true}, {0, 5, 9, true}, {0, 6, 14, true},
+        {1, 2, 8, true}, {1, 5, 10, true}, {2, 3, 7, true},
+        {2, 4, 2, true}, {3, 4, 6, true}, {4, 5, 11, true},
+        {5, 6, 2, true}, {3, 6, 9, true}
     };
 
+    // Initialize UI Fields
     for (int i = 0; i < MAX_GRAPH_E; i++) {
         float y = 337.0f + i * 25.0f;
-        edgeFromFields[i] = InputField({904.0f, y, 46.0f, 22.0f}, "u", 3);
-        edgeToFields[i] = InputField({960.0f, y, 46.0f, 22.0f}, "v", 3);
+        edgeFromFields[i]   = InputField({904.0f, y, 46.0f, 22.0f}, "u", 3);
+        edgeToFields[i]     = InputField({960.0f, y, 46.0f, 22.0f}, "v", 3);
         edgeWeightFields[i] = InputField({1016.0f, y, 88.0f, 22.0f}, "w", 5);
     }
 
     for (int r = 0; r < MAX_GRAPH_N; r++) {
+        float yAdj = 338.0f + r * 36.0f;
+        adjListFields[r] = InputField({952.0f, yAdj, 240.0f, 24.0f}, "neighbor,weight", 64);
         for (int c = 0; c < MAX_GRAPH_N; c++) {
             float x = 929.0f + c * 33.0f;
             float y = 334.0f + r * 33.0f;
             matrixFields[r][c] = InputField({x, y, 28.0f, 22.0f}, "0", 4);
         }
-    }
-
-    for (int i = 0; i < MAX_GRAPH_N; i++) {
-        float y = 338.0f + i * 36.0f;
-        adjListFields[i] = InputField({952.0f, y, 240.0f, 24.0f}, "neighbor,weight", 64);
     }
 
     SyncFieldsFromGraph();
@@ -269,31 +205,22 @@ GraphScreen::GraphScreen()
 
 void GraphScreen::ClearInputFocus() {
     for (int i = 0; i < MAX_GRAPH_E; i++) {
-        edgeFromFields[i].focused = false;
-        edgeToFields[i].focused = false;
-        edgeWeightFields[i].focused = false;
+        edgeFromFields[i].focused = edgeToFields[i].focused = edgeWeightFields[i].focused = false;
     }
     for (int r = 0; r < MAX_GRAPH_N; r++) {
         adjListFields[r].focused = false;
-        for (int c = 0; c < MAX_GRAPH_N; c++) {
-            matrixFields[r][c].focused = false;
-        }
+        for (int c = 0; c < MAX_GRAPH_N; c++) matrixFields[r][c].focused = false;
     }
-    editField.focused = false;
-    editFromField.focused = false;
-    editToField.focused = false;
+    editField.focused = editFromField.focused = editToField.focused = false;
 }
 
 void GraphScreen::ClearSelection() {
     selectionType = GraphSelectionType::None;
-    selectedIndex = -1;
-    draggingNodeIndex = -1;
+    selectedIndex = draggingNodeIndex = -1;
 }
 
 void GraphScreen::SetInputMode(GraphInputMode mode) {
-    if (inputMode == mode) {
-        return;
-    }
+    if (inputMode == mode) return;
     inputMode = mode;
     inputScrollY = 0.0f;
     ClearInputFocus();
@@ -301,58 +228,39 @@ void GraphScreen::SetInputMode(GraphInputMode mode) {
 }
 
 void GraphScreen::SetIndexBase(int base) {
-    if (indexBase == base) {
-        return;
-    }
+    if (indexBase == base) return;
     indexBase = base;
     inputScrollY = 0.0f;
     SyncFieldsFromGraph();
 }
 
 void GraphScreen::SyncFieldsFromGraph(bool clearFocus) {
-    if (clearFocus) {
-        ClearInputFocus();
-    }
+    if (clearFocus) ClearInputFocus();
 
     int visibleEdgeCount = 0;
     for (int i = 0; i < static_cast<int>(edges.size()); i++) {
-        edgeFromFields[i].Clear();
-        edgeToFields[i].Clear();
-        edgeWeightFields[i].Clear();
+        edgeFromFields[i].Clear(); edgeToFields[i].Clear(); edgeWeightFields[i].Clear();
         if (edges[i].visible) {
-            edgeFromFields[visibleEdgeCount].text = nodes[edges[i].u].label;
-            edgeToFields[visibleEdgeCount].text   = nodes[edges[i].v].label;
+            edgeFromFields[visibleEdgeCount].text   = nodes[edges[i].u].label;
+            edgeToFields[visibleEdgeCount].text     = nodes[edges[i].v].label;
             edgeWeightFields[visibleEdgeCount].text = std::to_string(edges[i].w);
             visibleEdgeCount++;
         }
     }
     for (int i = visibleEdgeCount; i < MAX_GRAPH_E; i++) {
-        edgeFromFields[i].Clear();
-        edgeToFields[i].Clear();
-        edgeWeightFields[i].Clear();
+        edgeFromFields[i].Clear(); edgeToFields[i].Clear(); edgeWeightFields[i].Clear();
     }
 
     for (int r = 0; r < nodeCount; r++) {
-        for (int c = 0; c < nodeCount; c++) {
-            matrixFields[r][c].text = "0";
-        }
-    }
-
-    for (const auto& edge : edges) {
-        if (!edge.visible) {
-            continue;
-        }
-        if (edge.u < nodeCount && edge.v < nodeCount) {
-            matrixFields[edge.u][edge.v].text = std::to_string(edge.w);
-            matrixFields[edge.v][edge.u].text = std::to_string(edge.w);
-        }
+        for (int c = 0; c < nodeCount; c++) matrixFields[r][c].text = "0";
     }
 
     std::vector<std::string> rows(nodeCount);
     for (const auto& edge : edges) {
-        if (!edge.visible || edge.u >= nodeCount || edge.v >= nodeCount) {
-            continue;
-        }
+        if (!edge.visible || edge.u >= nodeCount || edge.v >= nodeCount) continue;
+        
+        matrixFields[edge.u][edge.v].text = matrixFields[edge.v][edge.u].text = std::to_string(edge.w);
+
         if (!rows[edge.u].empty()) rows[edge.u] += ' ';
         rows[edge.u] += nodes[edge.v].label + "," + std::to_string(edge.w);
 
@@ -360,108 +268,88 @@ void GraphScreen::SyncFieldsFromGraph(bool clearFocus) {
         rows[edge.v] += nodes[edge.u].label + "," + std::to_string(edge.w);
     }
 
-    for (int i = 0; i < nodeCount; i++) {
-        adjListFields[i].text = rows[i];
-    }
+    for (int i = 0; i < nodeCount; i++) adjListFields[i].text = rows[i];
 }
 
 bool GraphScreen::ApplyInputToGraph(bool showMessage) {
     std::vector<GEdge> nextEdges;
 
     auto addEdge = [&](int u, int v, int w) {
-        if (u < 0 || v < 0 || u >= nodeCount || v >= nodeCount || u == v) {
-            return;
+        if (u >= 0 && v >= 0 && u < nodeCount && v < nodeCount && u != v) {
+            nextEdges.push_back({u, v, w, true});
         }
-        nextEdges.push_back({u, v, w, true});
     };
 
-    if (inputMode == GraphInputMode::EdgeList) {
-        for (int i = 0; i < MAX_GRAPH_E; i++) {
-            bool emptyRow = edgeFromFields[i].text.empty() && edgeToFields[i].text.empty() && edgeWeightFields[i].text.empty();
-            if (emptyRow) {
-                continue;
+    switch (inputMode) {
+        case GraphInputMode::EdgeList:
+            for (int i = 0; i < MAX_GRAPH_E; i++) {
+                if (edgeFromFields[i].text.empty() && edgeToFields[i].text.empty() && edgeWeightFields[i].text.empty()) continue;
+                int u = 0, v = 0, w = 0;
+                if (!ParseNodeRef(edgeFromFields[i].text, indexBase, nodes, nodeCount, &u) ||
+                    !ParseNodeRef(edgeToFields[i].text, indexBase, nodes, nodeCount, &v) ||
+                    !ParseIntStrict(edgeWeightFields[i].text, &w)) {
+                    if (showMessage) SetMsg("Edge: u/v can be label or index, w must be a number.", Pal::BtnDanger, 2.5f);
+                    return false;
+                }
+                addEdge(u, v, w);
             }
+            break;
 
-            int u = 0;
-            int v = 0;
-            int w = 0;
-            if (!ParseNodeRef(edgeFromFields[i].text, indexBase, nodes, nodeCount, &u) ||
-                !ParseNodeRef(edgeToFields[i].text,   indexBase, nodes, nodeCount, &v) ||
-                !ParseIntStrict(edgeWeightFields[i].text, &w)) {
-                if (showMessage) {
-                    SetMsg("Edge: u/v can be label or index, w must be a number.", Pal::BtnDanger, 2.5f);
-                }
-                return false;
-            }
-            addEdge(u, v, w);
-        }
-    } else if (inputMode == GraphInputMode::AdjacencyMatrix) {
-        for (int r = 0; r < nodeCount; r++) {
-            for (int c = r + 1; c < nodeCount; c++) {
-                int w = 0;
-                if (!ParseIntStrict(matrixFields[r][c].text, &w)) {
-                    if (showMessage) {
-                        SetMsg("Matrix values must be numbers.", Pal::BtnDanger, 2.5f);
+        case GraphInputMode::AdjacencyMatrix:
+            for (int r = 0; r < nodeCount; r++) {
+                for (int c = r + 1; c < nodeCount; c++) {
+                    int w = 0;
+                    if (!ParseIntStrict(matrixFields[r][c].text, &w)) {
+                        if (showMessage) SetMsg("Matrix values must be numbers.", Pal::BtnDanger, 2.5f);
+                        return false;
                     }
-                    return false;
-                }
-                if (w != 0) {
-                    addEdge(r, c, w);
+                    if (w != 0) addEdge(r, c, w);
                 }
             }
-        }
-    } else {
-        for (int r = 0; r < nodeCount; r++) {
-            std::istringstream row(adjListFields[r].text);
-            std::string token;
-            while (row >> token) {
-                size_t sep = token.find_first_of(",:/-");
-                if (sep == std::string::npos || sep == 0 || sep + 1 >= token.size()) {
-                    if (showMessage) {
-                        SetMsg("Adjacency List: use label,weight (e.g. B,7).", Pal::BtnDanger, 2.5f);
+            break;
+
+        case GraphInputMode::AdjacencyList:
+            for (int r = 0; r < nodeCount; r++) {
+                std::istringstream row(adjListFields[r].text);
+                std::string token;
+                while (row >> token) {
+                    size_t sep = token.find_first_of(",:/-");
+                    if (sep == std::string::npos || sep == 0 || sep + 1 >= token.size()) {
+                        if (showMessage) SetMsg("Adjacency List: use label,weight (e.g. B,7).", Pal::BtnDanger, 2.5f);
+                        return false;
                     }
-                    return false;
-                }
-                std::string neighborStr = token.substr(0, sep);
-                std::string weightStr   = token.substr(sep + 1);
-                int neighbor = 0;
-                int weight   = 0;
-                if (!ParseNodeRef(neighborStr, indexBase, nodes, nodeCount, &neighbor) ||
-                    !ParseIntStrict(weightStr, &weight)) {
-                    if (showMessage) {
-                        SetMsg("Adjacency List: use label,weight (e.g. B,7).", Pal::BtnDanger, 2.5f);
+                    int neighbor = 0, weight = 0;
+                    if (!ParseNodeRef(token.substr(0, sep), indexBase, nodes, nodeCount, &neighbor) ||
+                        !ParseIntStrict(token.substr(sep + 1), &weight)) {
+                        if (showMessage) SetMsg("Adjacency List: use label,weight (e.g. B,7).", Pal::BtnDanger, 2.5f);
+                        return false;
                     }
-                    return false;
-                }
-                if (neighbor > r) {
-                    addEdge(r, neighbor, weight);
+                    if (neighbor > r) addEdge(r, neighbor, weight);
                 }
             }
-        }
+            break;
     }
 
     edges = std::move(nextEdges);
-    if (selectionType == GraphSelectionType::Edge && selectedIndex >= static_cast<int>(edges.size())) {
-        ClearSelection();
-    }
-    if (selectionType == GraphSelectionType::Node && (selectedIndex < 0 || selectedIndex >= nodeCount || !nodes[selectedIndex].visible)) {
-        ClearSelection();
-    }
-    if (showMessage) {
-        SetMsg("Graph updated from input.", Pal::BtnSuccess, 2.0f);
-    }
+    
+    // Clean up selection if out of bounds
+    if (selectionType == GraphSelectionType::Edge && selectedIndex >= static_cast<int>(edges.size())) ClearSelection();
+    if (selectionType == GraphSelectionType::Node && (selectedIndex < 0 || selectedIndex >= nodeCount || !nodes[selectedIndex].visible)) ClearSelection();
+    
+    if (showMessage) SetMsg("Graph updated from input.", Pal::BtnSuccess, 2.0f);
     return true;
 }
 
+// --- Dialog Handlers ---
 void GraphScreen::OpenChangeDialog() {
     if (selectionType == GraphSelectionType::None || selectedIndex < 0) {
         SetMsg("Click a node or edge first.", Pal::BtnDanger, 2.5f);
         return;
     }
-
     editDialogOpen = true;
     editField.focused = true;
     editField.Clear();
+    
     if (selectionType == GraphSelectionType::Node) {
         editTarget = GraphEditTarget::NodeLabel;
         editField.text = nodes[selectedIndex].label;
@@ -491,9 +379,7 @@ void GraphScreen::OpenAddEdgeDialog() {
     editDialogOpen = true;
     editTarget = GraphEditTarget::AddEdge;
     ClearInputFocus();
-    editField.Clear();
-    editFromField.Clear();
-    editToField.Clear();
+    editField.Clear(); editFromField.Clear(); editToField.Clear();
     editField.focused = true;
 }
 
@@ -501,83 +387,45 @@ void GraphScreen::ApplySelectedEdit() {
     if (!editDialogOpen) return;
 
     if (editTarget == GraphEditTarget::AddNodeLabel) {
-        if (editField.text.empty()) {
-            SetMsg("Node label cannot be empty.", Pal::BtnDanger, 2.5f);
-            return;
-        }
+        if (editField.text.empty()) { SetMsg("Node label cannot be empty.", Pal::BtnDanger, 2.5f); return; }
         AddNodeAtRandom(editField.text);
-        editDialogOpen = false;
-        editTarget = GraphEditTarget::None;
-        ClearInputFocus();
-        return;
-    }
-
-    if (editTarget == GraphEditTarget::AddEdge) {
-        int u = -1;
-        int v = -1;
-        int weight = 0;
-        if (!ParseIntStrict(editField.text, &weight) || weight <= 0) {
-            SetMsg("Edge weight must be a positive number.", Pal::BtnDanger, 2.5f);
-            return;
-        }
+    } 
+    else if (editTarget == GraphEditTarget::AddEdge) {
+        int u = -1, v = -1, weight = 0;
+        if (!ParseIntStrict(editField.text, &weight) || weight <= 0) { SetMsg("Edge weight must be positive.", Pal::BtnDanger, 2.5f); return; }
         if (!ParseNodeRef(editFromField.text, indexBase, nodes, nodeCount, &u) ||
-            !ParseNodeRef(editToField.text, indexBase, nodes, nodeCount, &v)) {
-            SetMsg("From/To must be valid node labels or indices.", Pal::BtnDanger, 2.5f);
-            return;
-        }
-        if (u == v) {
-            SetMsg("From and To must be different nodes.", Pal::BtnDanger, 2.5f);
-            return;
-        }
+            !ParseNodeRef(editToField.text, indexBase, nodes, nodeCount, &v)) { SetMsg("Invalid From/To nodes.", Pal::BtnDanger, 2.5f); return; }
+        if (u == v) { SetMsg("From and To must be different.", Pal::BtnDanger, 2.5f); return; }
 
+        bool found = false;
         for (auto& edge : edges) {
-            if (!edge.visible) {
-                continue;
-            }
-            if ((edge.u == u && edge.v == v) || (edge.u == v && edge.v == u)) {
+            if (edge.visible && ((edge.u == u && edge.v == v) || (edge.u == v && edge.v == u))) {
                 edge.w = weight;
-                editDialogOpen = false;
-                editTarget = GraphEditTarget::None;
-                ClearInputFocus();
-                SyncFieldsFromGraph(false);
                 SetMsg("Edge exists: weight updated.", Pal::BtnSuccess, 2.0f);
-                return;
+                found = true; break;
             }
         }
-
-        edges.push_back({u, v, weight, true});
-        editDialogOpen = false;
-        editTarget = GraphEditTarget::None;
-        ClearInputFocus();
-        SyncFieldsFromGraph(false);
-        SetMsg("Edge added!", Pal::BtnSuccess, 2.0f);
-        return;
-    }
-
-    if (selectionType == GraphSelectionType::None || selectedIndex < 0) {
-        return;
-    }
-
-    if (editTarget == GraphEditTarget::NodeLabel) {
-        if (editField.text.empty()) {
-            SetMsg("Node label cannot be empty.", Pal::BtnDanger, 2.5f);
-            return;
+        if (!found) {
+            edges.push_back({u, v, weight, true});
+            SetMsg("Edge added!", Pal::BtnSuccess, 2.0f);
         }
-        nodes[selectedIndex].label = editField.text;
-    } else if (editTarget == GraphEditTarget::EdgeWeight) {
-        int weight = 0;
-        if (!ParseIntStrict(editField.text, &weight)) {
-            SetMsg("Edge weight must be numeric.", Pal::BtnDanger, 2.5f);
-            return;
+    } 
+    else if (selectionType != GraphSelectionType::None && selectedIndex >= 0) {
+        if (editTarget == GraphEditTarget::NodeLabel) {
+            if (editField.text.empty()) { SetMsg("Node label cannot be empty.", Pal::BtnDanger, 2.5f); return; }
+            nodes[selectedIndex].label = editField.text;
+        } else if (editTarget == GraphEditTarget::EdgeWeight) {
+            int weight = 0;
+            if (!ParseIntStrict(editField.text, &weight)) { SetMsg("Edge weight must be numeric.", Pal::BtnDanger, 2.5f); return; }
+            edges[selectedIndex].w = weight;
         }
-        edges[selectedIndex].w = weight;
+        SetMsg("Value updated.", Pal::BtnSuccess, 2.0f);
     }
 
     editDialogOpen = false;
     editTarget = GraphEditTarget::None;
     ClearInputFocus();
     SyncFieldsFromGraph(false);
-    SetMsg("Value updated.", Pal::BtnSuccess, 2.0f);
 }
 
 void GraphScreen::DeleteSelected() {
@@ -585,493 +433,226 @@ void GraphScreen::DeleteSelected() {
         SetMsg("Click a node or edge first.", Pal::BtnDanger, 2.5f);
         return;
     }
-
     if (selectionType == GraphSelectionType::Node) {
         nodes[selectedIndex].visible = false;
         for (auto& edge : edges) {
-            if (edge.u == selectedIndex || edge.v == selectedIndex) {
-                edge.visible = false;
-            }
+            if (edge.u == selectedIndex || edge.v == selectedIndex) edge.visible = false;
         }
         SetMsg("Node removed from preview.", Pal::BtnSuccess, 2.0f);
     } else {
         edges[selectedIndex].visible = false;
         SetMsg("Edge removed from preview.", Pal::BtnSuccess, 2.0f);
     }
-
     ClearSelection();
     SyncFieldsFromGraph(false);
 }
 
+// --- Scrolling & UI Helpers ---
 float GraphScreen::GetInputContentHeight() const {
     switch (inputMode) {
-        case GraphInputMode::EdgeList:
-            return (kEdgeListRowY - kInputClip.y) + MAX_GRAPH_E * kEdgeListRowGap + 8.0f;
-        case GraphInputMode::AdjacencyMatrix:
-            return (kMatrixRowY - kInputClip.y) + std::min(nodeCount, 9) * kMatrixGap + 8.0f;
-        case GraphInputMode::AdjacencyList:
-            return (kAdjRowY - kInputClip.y) + nodeCount * kAdjRowGap + 8.0f;
+        case GraphInputMode::EdgeList: return (kEdgeListRowY - kInputClip.y) + MAX_GRAPH_E * kEdgeListRowGap + 8.0f;
+        case GraphInputMode::AdjacencyMatrix: return (kMatrixRowY - kInputClip.y) + std::min(nodeCount, 9) * kMatrixGap + 8.0f;
+        case GraphInputMode::AdjacencyList: return (kAdjRowY - kInputClip.y) + nodeCount * kAdjRowGap + 8.0f;
     }
     return 400.0f;
 }
 
 float GraphScreen::GetInputMaxScroll() const {
-    float h = GetInputContentHeight() - kInputClip.height;
-    return h > 0.0f ? h : 0.0f;
+    return std::max(0.0f, GetInputContentHeight() - kInputClip.height);
 }
 
 void GraphScreen::ClampInputScroll() {
-    float maxScroll = GetInputMaxScroll();
-    if (inputScrollY < 0.0f) inputScrollY = 0.0f;
-    if (inputScrollY > maxScroll) inputScrollY = maxScroll;
+    inputScrollY = std::clamp(inputScrollY, 0.0f, GetInputMaxScroll());
 }
 
 void GraphScreen::SetMsg(const char* msg, Color c, float dur) {
-    message = msg;
-    msgColor = c;
-    msgTimer = dur;
+    message = msg; msgColor = c; msgTimer = dur;
 }
 
 void GraphScreen::AddNodeAtRandom(const std::string& label) {
-    if (nodeCount >= MAX_GRAPH_N) {
-        SetMsg("Maximum 26 nodes reached.", Pal::BtnDanger, 2.5f);
-        return;
-    }
-    float minX = kNodeRadius + 8.0f;
-    float maxX = 860.0f - kNodeRadius - 8.0f;
-    float minY = 72.0f + kNodeRadius + 8.0f;
-    float maxY = 610.0f - kNodeRadius - 8.0f;
-    auto rand01 = []() -> float {
-        return static_cast<float>(GetRandomValue(0, 10000)) / 10000.0f;
-    };
+    if (nodeCount >= MAX_GRAPH_N) { SetMsg("Maximum 26 nodes reached.", Pal::BtnDanger, 2.5f); return; }
+    
+    float minX = kNodeRadius + 8.0f, maxX = 860.0f - kNodeRadius - 8.0f;
+    float minY = 72.0f + kNodeRadius + 8.0f, maxY = 610.0f - kNodeRadius - 8.0f;
+    auto rand01 = []() { return static_cast<float>(GetRandomValue(0, 10000)) / 10000.0f; };
 
-    float x = minX + rand01() * (maxX - minX);
-    float y = minY + rand01() * (maxY - minY);
-    float minDist = kNodeRadius * 2.0f + 10.0f;
-    float minDist2 = minDist * minDist;
-
+    float x = 0, y = 0, minDist2 = std::pow(kNodeRadius * 2.0f + 10.0f, 2);
     for (int attempt = 0; attempt < 32; ++attempt) {
-        bool overlap = false;
-        for (int i = 0; i < nodeCount; i++) {
-            if (!nodes[i].visible) {
-                continue;
-            }
-            float dx = nodes[i].x - x;
-            float dy = nodes[i].y - y;
-            if (dx * dx + dy * dy < minDist2) {
-                overlap = true;
-                break;
-            }
-        }
-        if (!overlap) {
-            break;
-        }
         x = minX + rand01() * (maxX - minX);
         y = minY + rand01() * (maxY - minY);
+        bool overlap = false;
+        for (int i = 0; i < nodeCount; i++) {
+            if (nodes[i].visible && (std::pow(nodes[i].x - x, 2) + std::pow(nodes[i].y - y, 2) < minDist2)) {
+                overlap = true; break;
+            }
+        }
+        if (!overlap) break;
     }
 
-    nodes[nodeCount] = {x, y, label, true};
-    nodeCount++;
+    nodes[nodeCount++] = {x, y, label, true};
     SyncFieldsFromGraph(false);
+    
     char buf[64];
     std::snprintf(buf, sizeof(buf), "Node %s added.", label.c_str());
     SetMsg(buf, Pal::BtnSuccess, 2.0f);
 }
 
+// ============================================================================
+// UPDATE LOOP
+// ============================================================================
 Screen GraphScreen::Update() {
     float dt = GetFrameTime();
-    if (msgTimer > 0.0f) {
-        msgTimer -= dt;
-        if (msgTimer < 0.0f) {
-            msgTimer = 0.0f;
-        }
-    }
+    UpdateMessages(dt);
 
-    if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) {
-        return Screen::Home;
-    }
+    if (btnBack.Update() || IsKeyPressed(KEY_ESCAPE)) return Screen::Home;
 
-    Rectangle tabEdge = kTabEdge;
-    Rectangle tabMatrix = kTabMatrix;
-    Rectangle tabAdj = kTabAdj;
-
-    Vector2 mouse = GetMousePosition();
     if (!editDialogOpen) {
-        if (CheckCollisionPointRec(mouse, tabEdge) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            SetInputMode(GraphInputMode::EdgeList);
-        }
-        if (CheckCollisionPointRec(mouse, tabMatrix) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            SetInputMode(GraphInputMode::AdjacencyMatrix);
-        }
-        if (CheckCollisionPointRec(mouse, tabAdj) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            SetInputMode(GraphInputMode::AdjacencyList);
-        }
+        UpdateTabsAndScroll();
+        UpdateInputFields();
+        HandleGraphInteraction(GetMousePosition());
+        HandleButtons();
+    } else {
+        HandleDialogUpdate();
+    }
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || GetMouseWheelMove() != 0.0f) {
-            if (CheckCollisionPointRec(mouse, kInputContentArea)) {
-                inputScrollY -= GetMouseWheelMove() * 32.0f;
-                ClampInputScroll();
-            }
+    UpdateMSTAnimation(dt);
+    return Screen::MST;
+}
+
+void GraphScreen::UpdateMessages(float dt) {
+    if (msgTimer > 0.0f) msgTimer = std::max(0.0f, msgTimer - dt);
+}
+
+void GraphScreen::UpdateTabsAndScroll() {
+    Vector2 mouse = GetMousePosition();
+    if (CheckCollisionPointRec(mouse, kTabEdge) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) SetInputMode(GraphInputMode::EdgeList);
+    if (CheckCollisionPointRec(mouse, kTabMatrix) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) SetInputMode(GraphInputMode::AdjacencyMatrix);
+    if (CheckCollisionPointRec(mouse, kTabAdj) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) SetInputMode(GraphInputMode::AdjacencyList);
+
+    if (CheckCollisionPointRec(mouse, kInputContentArea) && (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || GetMouseWheelMove() != 0.0f)) {
+        inputScrollY -= GetMouseWheelMove() * 32.0f;
+    }
+
+    float maxScroll = GetInputMaxScroll();
+    if (maxScroll > 0.0f) {
+        float thumbH = std::max(34.0f, kScrollTrack.height * (kInputClip.height / GetInputContentHeight()));
+        float trackRange = kScrollTrack.height - thumbH;
+        Rectangle thumb = {kScrollTrack.x, kScrollTrack.y + trackRange * (inputScrollY / maxScroll), kScrollTrack.width, thumbH};
+
+        if (!inputScrollDragging && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse, thumb)) {
+            inputScrollDragging = true;
+            inputScrollDragOffset = mouse.y - thumb.y;
         }
-
-        float maxScroll = GetInputMaxScroll();
-        if (maxScroll > 0.0f) {
-            float thumbH = kScrollTrack.height * (kInputClip.height / GetInputContentHeight());
-            if (thumbH < 34.0f) thumbH = 34.0f;
-            float trackRange = kScrollTrack.height - thumbH;
-            float thumbY = kScrollTrack.y + trackRange * (inputScrollY / maxScroll);
-            Rectangle thumb = {kScrollTrack.x, thumbY, kScrollTrack.width, thumbH};
-
-            if (!inputScrollDragging && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse, thumb)) {
-                inputScrollDragging = true;
-                inputScrollDragOffset = mouse.y - thumb.y;
-            }
-            if (inputScrollDragging) {
-                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-                    float nextThumbY = mouse.y - inputScrollDragOffset;
-                    if (nextThumbY < kScrollTrack.y) nextThumbY = kScrollTrack.y;
-                    if (nextThumbY > kScrollTrack.y + trackRange) nextThumbY = kScrollTrack.y + trackRange;
-                    inputScrollY = trackRange > 0.0f ? ((nextThumbY - kScrollTrack.y) / trackRange) * maxScroll : 0.0f;
-                    ClampInputScroll();
-                } else {
-                    inputScrollDragging = false;
-                }
-            }
-        } else {
-            inputScrollDragging = false;
-            inputScrollY = 0.0f;
-        }
-
-        ClampInputScroll();
-        int matrixDisplayN = std::min(nodeCount, 9);
-        if (inputMode == GraphInputMode::EdgeList) {
-            LayoutEdgeListFields(edgeFromFields, edgeToFields, edgeWeightFields, inputScrollY, MAX_GRAPH_E);
-            for (int i = 0; i < MAX_GRAPH_E; i++) {
-                edgeFromFields[i].Update();
-                edgeToFields[i].Update();
-                edgeWeightFields[i].Update();
-            }
-        } else if (inputMode == GraphInputMode::AdjacencyMatrix) {
-            LayoutMatrixFields(matrixFields, inputScrollY, matrixDisplayN);
-            for (int r = 0; r < matrixDisplayN; r++) {
-                for (int c = 0; c < matrixDisplayN; c++) {
-                    matrixFields[r][c].Update();
-                }
-            }
-        } else {
-            LayoutAdjListFields(adjListFields, inputScrollY, nodeCount);
-            for (int i = 0; i < nodeCount; i++) {
-                adjListFields[i].Update();
-            }
-        }
-
-        bool anyInputFocused = false;
-        if (inputMode == GraphInputMode::EdgeList) {
-            for (int i = 0; i < MAX_GRAPH_E; i++) {
-                anyInputFocused = anyInputFocused || edgeFromFields[i].focused || edgeToFields[i].focused || edgeWeightFields[i].focused;
-            }
-        } else if (inputMode == GraphInputMode::AdjacencyMatrix) {
-            for (int r = 0; r < matrixDisplayN; r++) {
-                for (int c = 0; c < matrixDisplayN; c++) {
-                    anyInputFocused = anyInputFocused || matrixFields[r][c].focused;
-                }
-            }
-        } else {
-            for (int i = 0; i < nodeCount; i++) {
-                anyInputFocused = anyInputFocused || adjListFields[i].focused;
-            }
-        }
-        if (anyInputFocused) {
-            ApplyInputToGraph(false);
-        }
-
-        bool insideGraph = mouse.x < 860.0f && mouse.y > 72.0f && mouse.y < 610.0f;
-        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-            draggingNodeIndex = -1;
-        }
-
-        bool clickedGraph = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && insideGraph;
-        if (clickedGraph) {
-            int hitNode = -1;
-            for (int i = 0; i < nodeCount; i++) {
-                if (!nodes[i].visible) {
-                    continue;
-                }
-                float dx = mouse.x - nodes[i].x;
-                float dy = mouse.y - nodes[i].y;
-                if (dx * dx + dy * dy <= (kNodeRadius + 4.0f) * (kNodeRadius + 4.0f)) {
-                    hitNode = i;
-                    break;
-                }
-            }
-
-            if (hitNode >= 0) {
-                selectionType = GraphSelectionType::Node;
-                selectedIndex = hitNode;
-                draggingNodeIndex = hitNode;
-                draggingOffset = {nodes[hitNode].x - mouse.x, nodes[hitNode].y - mouse.y};
+        if (inputScrollDragging) {
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                float nextThumbY = std::clamp(mouse.y - inputScrollDragOffset, kScrollTrack.y, kScrollTrack.y + trackRange);
+                inputScrollY = trackRange > 0.0f ? ((nextThumbY - kScrollTrack.y) / trackRange) * maxScroll : 0.0f;
             } else {
-                int hitEdge = -1;
-                for (int i = 0; i < static_cast<int>(edges.size()); i++) {
-                    const auto& edge = edges[i];
-                    if (!edge.visible || !nodes[edge.u].visible || !nodes[edge.v].visible) {
-                        continue;
-                    }
-                    Vector2 a = {nodes[edge.u].x, nodes[edge.u].y};
-                    Vector2 b = {nodes[edge.v].x, nodes[edge.v].y};
-                    if (DistanceToSegment(mouse, a, b) < 9.0f) {
-                        hitEdge = i;
-                        break;
-                    }
-                }
-
-                if (hitEdge >= 0) {
-                    selectionType = GraphSelectionType::Edge;
-                    selectedIndex = hitEdge;
-                    draggingNodeIndex = -1;
-                } else {
-                    ClearSelection();
-                    draggingNodeIndex = -1;
-                }
+                inputScrollDragging = false;
             }
-        }
-
-        if (draggingNodeIndex >= 0 && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            int i = draggingNodeIndex;
-            if (i >= 0 && i < nodeCount && nodes[i].visible) {
-                float minX = kNodeRadius + 8.0f;
-                float maxX = 860.0f - kNodeRadius - 8.0f;
-                float minY = 72.0f + kNodeRadius + 8.0f;
-                float maxY = 610.0f - kNodeRadius - 8.0f;
-
-                float nextX = mouse.x + draggingOffset.x;
-                float nextY = mouse.y + draggingOffset.y;
-                if (nextX < minX) nextX = minX;
-                if (nextX > maxX) nextX = maxX;
-                if (nextY < minY) nextY = minY;
-                if (nextY > maxY) nextY = maxY;
-
-                nodes[i].x = nextX;
-                nodes[i].y = nextY;
-            }
-        }
-
-        if (btnDelete.Update()) {
-            DeleteSelected();
-        }
-        if (btnChange.Update()) {
-            OpenChangeDialog();
-        }
-        if (btnAddNode.Update()) {
-            OpenAddNodeDialog();
-        }
-        if (btnAddEdge.Update()) {
-            OpenAddEdgeDialog();
-        }
-        if (btnLoadFile.Update()) {
-            std::string path = "data.txt";
-            std::vector<std::string> lines = InitFile::loadLines(path);
-            if (lines.empty()) {
-                SetMsg("Failed to open graph file or file is empty.", Pal::BtnDanger, 2.5f);
-                return Screen::MST;
-            }
-
-            struct LoadedEdge {
-                std::string u;
-                std::string v;
-                int w;
-            };
-
-            std::vector<std::string> labels;
-            std::unordered_map<std::string, int> labelToIndex;
-            std::vector<LoadedEdge> loadedEdges;
-
-            int expectedNodeCount = -1;
-            int expectedEdgeCount = -1;
-            int parsedNodeCount = 0;
-            int parsedEdgeCount = 0;
-            int stage = 0;  // 0 = header, 1 = labels, 2 = edges
-
-            auto ensureNode = [&](const std::string& label) {
-                auto it = labelToIndex.find(label);
-                if (it != labelToIndex.end()) {
-                    return it->second;
-                }
-                int idx = static_cast<int>(labels.size());
-                labels.push_back(label);
-                labelToIndex[label] = idx;
-                return idx;
-            };
-
-            for (std::string line : lines) {
-                if (line.empty()) {
-                    continue;
-                }
-
-                std::istringstream iss(line);
-                std::vector<std::string> tokens;
-                std::string token;
-                while (iss >> token) {
-                    tokens.push_back(token);
-                }
-
-                if (tokens.empty()) {
-                    continue;
-                }
-
-                if (stage == 0) {
-                    if (tokens.size() != 2 || !ParseIntStrict(tokens[0], &expectedNodeCount) || !ParseIntStrict(tokens[1], &expectedEdgeCount)) {
-                        SetMsg("First line must be: nodeCount edgeCount", Pal::BtnDanger, 2.5f);
-                        return Screen::MST;
-                    }
-                    if (expectedNodeCount <= 0 || expectedEdgeCount < 0) {
-                        SetMsg("Node/edge counts must be positive.", Pal::BtnDanger, 2.5f);
-                        return Screen::MST;
-                    }
-                    stage = 1;
-                    continue;
-                }
-
-                if (stage == 1) {
-                    if (tokens.size() != 1) {
-                        SetMsg("Vertex names must be one per line.", Pal::BtnDanger, 2.5f);
-                        return Screen::MST;
-                    }
-                    ensureNode(tokens[0]);
-                    parsedNodeCount++;
-                    if (parsedNodeCount >= expectedNodeCount) {
-                        stage = 2;
-                    }
-                    continue;
-                }
-
-                if (stage == 2) {
-                    if (tokens.size() != 3) {
-                        SetMsg("Each edge line must be: from to weight", Pal::BtnDanger, 2.5f);
-                        return Screen::MST;
-                    }
-
-                    int weight = 0;
-                    if (!ParseIntStrict(tokens[2], &weight)) {
-                        SetMsg("Edge weight must be numeric.", Pal::BtnDanger, 2.5f);
-                        return Screen::MST;
-                    }
-
-                    ensureNode(tokens[0]);
-                    ensureNode(tokens[1]);
-                    loadedEdges.push_back({tokens[0], tokens[1], weight});
-                    parsedEdgeCount++;
-                }
-            }
-
-            if (expectedNodeCount <= 0) {
-                SetMsg("Graph file does not contain a valid header.", Pal::BtnDanger, 2.5f);
-                return Screen::MST;
-            }
-
-            if (parsedNodeCount != expectedNodeCount) {
-                SetMsg("Not enough vertex names in the file.", Pal::BtnDanger, 2.5f);
-                return Screen::MST;
-            }
-
-            if (parsedEdgeCount != expectedEdgeCount) {
-                SetMsg("Not enough edge lines in the file.", Pal::BtnDanger, 2.5f);
-                return Screen::MST;
-            }
-
-            nodeCount = std::min(static_cast<int>(labels.size()), MAX_GRAPH_N);
-            for (int i = 0; i < nodeCount; i++) {
-                nodes[i].label = labels[i];
-                nodes[i].visible = true;
-            }
-            for (int i = nodeCount; i < MAX_GRAPH_N; i++) {
-                nodes[i].visible = false;
-            }
-
-            edges.clear();
-            for (const auto& edge : loadedEdges) {
-                auto itU = labelToIndex.find(edge.u);
-                auto itV = labelToIndex.find(edge.v);
-                if (itU == labelToIndex.end() || itV == labelToIndex.end()) {
-                    continue;
-                }
-                int u = itU->second;
-                int v = itV->second;
-                if (u < 0 || v < 0 || u >= nodeCount || v >= nodeCount || u == v) {
-                    continue;
-                }
-                edges.push_back({u, v, edge.w, true});
-            }
-
-            const float centerX = 430.0f;
-            const float centerY = 342.0f;
-            const float radiusX = 260.0f;
-            const float radiusY = 180.0f;
-            const float startAngle = -1.5707963f;
-            for (int i = 0; i < nodeCount; i++) {
-                float angle = startAngle + (2.0f * 3.1415926f * i) / std::max(nodeCount, 1);
-                nodes[i].x = centerX + std::cos(angle) * radiusX;
-                nodes[i].y = centerY + std::sin(angle) * radiusY;
-                nodes[i].visible = true;
-            }
-
-            mstSteps.clear();
-            mstActive = false;
-            mstCurrentStep = 0;
-            mstStepTimer = 0.0f;
-            ClearSelection();
-            ClearInputFocus();
-            SyncFieldsFromGraph(false);
-
-            char buf[128];
-            std::snprintf(buf, sizeof(buf), "Loaded %d nodes and %d edges from file.", nodeCount, static_cast<int>(edges.size()));
-            SetMsg(buf, Pal::BtnSuccess, 3.0f);
         }
     } else {
-        if (editTarget == GraphEditTarget::AddEdge && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            Vector2 mouse = GetMousePosition();
-            bool hitWeight = CheckCollisionPointRec(mouse, editField.rect);
-            bool hitFrom = CheckCollisionPointRec(mouse, editFromField.rect);
-            bool hitTo = CheckCollisionPointRec(mouse, editToField.rect);
-            editField.focused = hitWeight;
-            editFromField.focused = hitFrom;
-            editToField.focused = hitTo;
-        }
+        inputScrollDragging = false; inputScrollY = 0.0f;
+    }
+    ClampInputScroll();
+}
 
-        if (editField.focused) {
-            editField.UpdateFocused();
+void GraphScreen::UpdateInputFields() {
+    bool anyInputFocused = false;
+    int matrixDisplayN = std::min(nodeCount, 9);
+
+    if (inputMode == GraphInputMode::EdgeList) {
+        LayoutEdgeListFields(edgeFromFields, edgeToFields, edgeWeightFields, inputScrollY, MAX_GRAPH_E);
+        for (int i = 0; i < MAX_GRAPH_E; i++) {
+            edgeFromFields[i].Update(); edgeToFields[i].Update(); edgeWeightFields[i].Update();
+            anyInputFocused = anyInputFocused || edgeFromFields[i].focused || edgeToFields[i].focused || edgeWeightFields[i].focused;
         }
-        if (editTarget == GraphEditTarget::AddEdge) {
-            if (editFromField.focused) {
-                editFromField.UpdateFocused();
+    } else if (inputMode == GraphInputMode::AdjacencyMatrix) {
+        LayoutMatrixFields(matrixFields, inputScrollY, matrixDisplayN);
+        for (int r = 0; r < matrixDisplayN; r++) {
+            for (int c = 0; c < matrixDisplayN; c++) {
+                matrixFields[r][c].Update();
+                anyInputFocused = anyInputFocused || matrixFields[r][c].focused;
             }
-            if (editToField.focused) {
-                editToField.UpdateFocused();
+        }
+    } else {
+        LayoutAdjListFields(adjListFields, inputScrollY, nodeCount);
+        for (int i = 0; i < nodeCount; i++) {
+            adjListFields[i].Update();
+            anyInputFocused = anyInputFocused || adjListFields[i].focused;
+        }
+    }
+
+    if (anyInputFocused) ApplyInputToGraph(false);
+}
+
+void GraphScreen::HandleGraphInteraction(Vector2 mouse) {
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) draggingNodeIndex = -1;
+
+    bool insideGraph = mouse.x < 860.0f && mouse.y > 72.0f && mouse.y < 610.0f;
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && insideGraph) {
+        int hitNode = -1;
+        for (int i = 0; i < nodeCount; i++) {
+            if (nodes[i].visible && std::pow(mouse.x - nodes[i].x, 2) + std::pow(mouse.y - nodes[i].y, 2) <= std::pow(kNodeRadius + 4.0f, 2)) {
+                hitNode = i; break;
             }
         }
-        if (btnEditOk.Update() || IsKeyPressed(KEY_ENTER)) {
-            ApplySelectedEdit();
-        }
-        if (btnEditCancel.Update() || IsKeyPressed(KEY_ESCAPE)) {
-            editDialogOpen = false;
-            editTarget = GraphEditTarget::None;
-            ClearInputFocus();
+
+        if (hitNode >= 0) {
+            selectionType = GraphSelectionType::Node; selectedIndex = draggingNodeIndex = hitNode;
+            draggingOffset = {nodes[hitNode].x - mouse.x, nodes[hitNode].y - mouse.y};
+        } else {
+            int hitEdge = -1;
+            for (int i = 0; i < static_cast<int>(edges.size()); i++) {
+                if (edges[i].visible && nodes[edges[i].u].visible && nodes[edges[i].v].visible) {
+                    if (DistanceToSegment(mouse, {nodes[edges[i].u].x, nodes[edges[i].u].y}, {nodes[edges[i].v].x, nodes[edges[i].v].y}) < 9.0f) {
+                        hitEdge = i; break;
+                    }
+                }
+            }
+            selectionType = hitEdge >= 0 ? GraphSelectionType::Edge : GraphSelectionType::None;
+            selectedIndex = hitEdge; draggingNodeIndex = -1;
         }
     }
 
-    if (btnKruskal.Update()) {
-        mstSteps.clear();
-        mstVisitOrder.clear();
-        mstActive = false;
-        RunKruskal();
+    if (draggingNodeIndex >= 0 && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && draggingNodeIndex < nodeCount) {
+        nodes[draggingNodeIndex].x = std::clamp(mouse.x + draggingOffset.x, kNodeRadius + 8.0f, 860.0f - kNodeRadius - 8.0f);
+        nodes[draggingNodeIndex].y = std::clamp(mouse.y + draggingOffset.y, 72.0f + kNodeRadius + 8.0f, 610.0f - kNodeRadius - 8.0f);
     }
-    if (btnPrim.Update()) {
-        mstSteps.clear();
-        mstVisitOrder.clear();
-        mstActive = false;
-        RunPrim();
+}
+
+void GraphScreen::HandleButtons() {
+    if (btnDelete.Update()) DeleteSelected();
+    if (btnChange.Update()) OpenChangeDialog();
+    if (btnAddNode.Update()) OpenAddNodeDialog();
+    if (btnAddEdge.Update()) OpenAddEdgeDialog();
+    
+    if (btnKruskal.Update()) { mstSteps.clear(); mstVisitOrder.clear(); mstActive = false; RunKruskal(); }
+    if (btnPrim.Update())    { mstSteps.clear(); mstVisitOrder.clear(); mstActive = false; RunPrim(); }
+    if (btnLoadFile.Update()) LoadGraphFromFile();
+}
+
+void GraphScreen::HandleDialogUpdate() {
+    if (editTarget == GraphEditTarget::AddEdge && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        Vector2 mouse = GetMousePosition();
+        editField.focused     = CheckCollisionPointRec(mouse, editField.rect);
+        editFromField.focused = CheckCollisionPointRec(mouse, editFromField.rect);
+        editToField.focused   = CheckCollisionPointRec(mouse, editToField.rect);
     }
 
+    if (editField.focused) editField.UpdateFocused();
+    if (editTarget == GraphEditTarget::AddEdge) {
+        if (editFromField.focused) editFromField.UpdateFocused();
+        if (editToField.focused) editToField.UpdateFocused();
+    }
+
+    if (btnEditOk.Update() || IsKeyPressed(KEY_ENTER)) ApplySelectedEdit();
+    if (btnEditCancel.Update() || IsKeyPressed(KEY_ESCAPE)) {
+        editDialogOpen = false; editTarget = GraphEditTarget::None; ClearInputFocus();
+    }
+}
+
+void GraphScreen::UpdateMSTAnimation(float dt) {
     if (mstActive && mstCurrentStep < (int)mstSteps.size()) {
         mstStepTimer -= dt;
         if (mstStepTimer <= 0.0f) {
@@ -1081,54 +662,124 @@ Screen GraphScreen::Update() {
             } else {
                 int total = mstSteps.empty() ? 0 : mstSteps.back().cumulativeWeight;
                 std::string orderText = FormatVisitOrder(mstVisitOrder, nodes, nodeCount);
-                std::string doneText = "Done! Total MST weight: " + std::to_string(total);
-                if (!orderText.empty() && orderText != "-") {
-                    doneText += " | ";
-                    doneText += orderText;
-                }
+                std::string doneText = "Done! Total MST weight: " + std::to_string(total) + (orderText != "-" ? " | " + orderText : "");
                 SetMsg(doneText.c_str(), {46, 160, 67, 255}, 5.0f);
             }
         }
     }
-
-    return Screen::MST;
 }
 
-void GraphScreen::Draw() const {
-    ClearBackground(Pal::BG);
+void GraphScreen::LoadGraphFromFile() {
+    std::vector<std::string> lines = InitFile::loadLines("data.txt");
+    if (lines.empty()) { SetMsg("Failed to open file or empty.", Pal::BtnDanger, 2.5f); return; }
 
-    DrawRectangleRec({0, 0, 1280, 72}, Pal::Surface);
-    DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
-    DrawTextEx(fontBold, "Minimum Spanning Tree", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
-    DrawTextEx(
-        fontRegular,
-        "Left: graph preview. Right: choose input style and load a graph file.",
-        {130, 52},
-        13.0f,
-        1.0f,
-        Pal::TxtLight
-    );
-    btnBack.Draw();
+    struct LoadedEdge { std::string u, v; int w; };
+    std::vector<std::string> labels;
+    std::unordered_map<std::string, int> labelToIndex;
+    std::vector<LoadedEdge> loadedEdges;
 
-    DrawLineEx({860, 72}, {860, 610}, 1.0f, Pal::Border);
+    int expectedNodeCount = -1, expectedEdgeCount = -1, parsedNodeCount = 0, parsedEdgeCount = 0, stage = 0;
 
-    // Build a per-edge step state lookup when MST is active
-    // stepState[i] = -2 (not in steps), -1 (next to process), s>=0 (step index, processed)
-    std::vector<int> edgeStepIdx(edges.size(), -2);
-    if (mstActive) {
-        for (int s = 0; s < (int)mstSteps.size(); s++) {
-            edgeStepIdx[mstSteps[s].edgeIdx] = s;
+    auto ensureNode = [&](const std::string& label) {
+        if (labelToIndex.count(label)) return labelToIndex[label];
+        int idx = labels.size();
+        labels.push_back(label);
+        return labelToIndex[label] = idx;
+    };
+
+    for (const auto& line : lines) {
+        if (line.empty()) continue;
+        std::istringstream iss(line);
+        std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
+        if (tokens.empty()) continue;
+
+        if (stage == 0) {
+            if (tokens.size() != 2 || !ParseIntStrict(tokens[0], &expectedNodeCount) || !ParseIntStrict(tokens[1], &expectedEdgeCount) || expectedNodeCount <= 0 || expectedEdgeCount < 0) {
+                SetMsg("Invalid header: nodeCount edgeCount", Pal::BtnDanger, 2.5f); return;
+            }
+            stage = 1; continue;
+        }
+        if (stage == 1) {
+            if (tokens.size() != 1) { SetMsg("Vertex names must be one per line.", Pal::BtnDanger, 2.5f); return; }
+            ensureNode(tokens[0]);
+            if (++parsedNodeCount >= expectedNodeCount) stage = 2;
+            continue;
+        }
+        if (stage == 2) {
+            int weight;
+            if (tokens.size() != 3 || !ParseIntStrict(tokens[2], &weight)) { SetMsg("Edge format: from to weight", Pal::BtnDanger, 2.5f); return; }
+            ensureNode(tokens[0]); ensureNode(tokens[1]);
+            loadedEdges.push_back({tokens[0], tokens[1], weight});
+            parsedEdgeCount++;
         }
     }
 
+    if (expectedNodeCount <= 0 || parsedNodeCount != expectedNodeCount || parsedEdgeCount != expectedEdgeCount) {
+        SetMsg("File data mismatch.", Pal::BtnDanger, 2.5f); return;
+    }
+
+    nodeCount = std::min(static_cast<int>(labels.size()), MAX_GRAPH_N);
+    for (int i = 0; i < MAX_GRAPH_N; i++) {
+        if (i < nodeCount) { nodes[i].label = labels[i]; nodes[i].visible = true; }
+        else nodes[i].visible = false;
+    }
+
+    edges.clear();
+    for (const auto& edge : loadedEdges) {
+        if (!labelToIndex.count(edge.u) || !labelToIndex.count(edge.v)) continue;
+        int u = labelToIndex[edge.u], v = labelToIndex[edge.v];
+        if (u >= 0 && v >= 0 && u < nodeCount && v < nodeCount && u != v) edges.push_back({u, v, edge.w, true});
+    }
+
+    const float cX = 430.0f, cY = 342.0f, rX = 260.0f, rY = 180.0f, startAng = -1.5707963f;
+    for (int i = 0; i < nodeCount; i++) {
+        float angle = startAng + (2.0f * PI * i) / std::max(nodeCount, 1);
+        nodes[i].x = cX + std::cos(angle) * rX;
+        nodes[i].y = cY + std::sin(angle) * rY;
+    }
+
+    mstSteps.clear(); mstActive = false; mstCurrentStep = 0; mstStepTimer = 0.0f;
+    ClearSelection(); ClearInputFocus(); SyncFieldsFromGraph(false);
+
+    char buf[128];
+    std::snprintf(buf, sizeof(buf), "Loaded %d nodes and %d edges.", nodeCount, (int)edges.size());
+    SetMsg(buf, Pal::BtnSuccess, 3.0f);
+}
+
+// ============================================================================
+// DRAW LOOP
+// ============================================================================
+void GraphScreen::Draw() const {
+    ClearBackground(Pal::BG);
+    DrawHeader();
+    DrawGraphView();
+    DrawInputPanel();
+    DrawBottomArea();
+    if (editDialogOpen) DrawEditDialog();
+}
+
+void GraphScreen::DrawHeader() const {
+    DrawRectangleRec({0, 0, 1280, 72}, Pal::Surface);
+    DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
+    DrawTextEx(fontBold, "Minimum Spanning Tree", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
+    DrawTextEx(fontRegular, "Left: graph preview. Right: choose input style and load a graph file.", {130, 52}, 13.0f, 1.0f, Pal::TxtLight);
+    btnBack.Draw();
+    DrawLineEx({860, 72}, {860, 610}, 1.0f, Pal::Border);
+}
+
+void GraphScreen::DrawGraphView() const {
+    std::vector<int> edgeStepIdx(edges.size(), -2);
+    if (mstActive) {
+        for (int s = 0; s < (int)mstSteps.size(); s++) edgeStepIdx[mstSteps[s].edgeIdx] = s;
+    }
+
+    // Draw Edges
     for (int i = 0; i < static_cast<int>(edges.size()); i++) {
         const GEdge& e = edges[i];
         if (!e.visible) continue;
 
-        Vector2 a = {nodes[e.u].x, nodes[e.u].y};
-        Vector2 b = {nodes[e.v].x, nodes[e.v].y};
-        bool selected = selectionType == GraphSelectionType::Edge && selectedIndex == i;
-
+        Vector2 a = {nodes[e.u].x, nodes[e.u].y}, b = {nodes[e.v].x, nodes[e.v].y};
+        bool selected = (selectionType == GraphSelectionType::Edge && selectedIndex == i);
         Color lineColor = Pal::EdgeColor;
         float lineW = 1.8f;
         bool isNext = false;
@@ -1136,70 +787,50 @@ void GraphScreen::Draw() const {
         if (mstActive) {
             int s = edgeStepIdx[i];
             if (s >= 0 && s < mstCurrentStep) {
-                // Already processed
-                if (mstSteps[s].added) {
-                    lineColor = {46, 180, 90, 255};   // green = in MST
-                    lineW = 3.6f;
-                } else {
-                    lineColor = {160, 60, 60, 180};   // red = skipped (cycle)
-                    lineW = 1.4f;
-                }
+                lineColor = mstSteps[s].added ? Color{46, 180, 90, 255} : Color{160, 60, 60, 180};
+                lineW = mstSteps[s].added ? 3.6f : 1.4f;
             } else if (s == mstCurrentStep) {
-                lineColor = {255, 200, 50, 255};      // yellow = next to process
-                lineW = 3.0f;
-                isNext = true;
+                lineColor = {255, 200, 50, 255}; lineW = 3.0f; isNext = true;
             } else {
-                lineColor = {100, 110, 140, 120};     // faded = not yet considered
-                lineW = 1.4f;
+                lineColor = {100, 110, 140, 120}; lineW = 1.4f;
             }
         }
 
-        if (selected) {
-            DrawLineEx(a, b, lineW + 3.6f, {255, 213, 79, 80});
-        } else if (isNext) {
-            DrawLineEx(a, b, lineW + 3.0f, {255, 200, 50, 55});
-        }
+        if (selected) DrawLineEx(a, b, lineW + 3.6f, {255, 213, 79, 80});
+        else if (isNext) DrawLineEx(a, b, lineW + 3.0f, {255, 200, 50, 55});
+        
         DrawLineEx(a, b, lineW, selected ? Pal::NodeHL : lineColor);
 
-        float mx = (a.x + b.x) * 0.5f + 6.0f;
-        float my = (a.y + b.y) * 0.5f - 10.0f;
-        char wbuf[16];
-        std::snprintf(wbuf, sizeof(wbuf), "%d", e.w);
+        char wbuf[16]; std::snprintf(wbuf, sizeof(wbuf), "%d", e.w);
         Color labelColor = selected ? Pal::NodeHL : (mstActive ? lineColor : Pal::TxtMid);
-        DrawTextEx(fontBold, wbuf, {mx, my}, 14.0f, 1.0f, labelColor);
+        DrawTextEx(fontBold, wbuf, {(a.x + b.x) * 0.5f + 6.0f, (a.y + b.y) * 0.5f - 10.0f}, 14.0f, 1.0f, labelColor);
     }
 
+    // Draw Nodes
     for (int i = 0; i < nodeCount; i++) {
-        const GNode& nd = nodes[i];
-        if (!nd.visible) {
-            continue;
-        }
-
-        bool selected = selectionType == GraphSelectionType::Node && selectedIndex == i;
-        bool isPending = false;
-        Color border = (selected || isPending) ? Pal::NodeHL : Pal::NodeBorder;
-        DrawCircleV({nd.x, nd.y}, kNodeRadius + 2.0f, border);
-        DrawCircleV({nd.x, nd.y}, kNodeRadius, Pal::NodeFill);
-
-        Vector2 ts = MeasureTextEx(fontBold, nd.label.c_str(), 17.0f, 1.0f);
-        DrawTextEx(fontBold, nd.label.c_str(), {nd.x - ts.x * 0.5f, nd.y - ts.y * 0.5f}, 17.0f, 1.0f, Pal::TxtDark);
+        if (!nodes[i].visible) continue;
+        bool selected = (selectionType == GraphSelectionType::Node && selectedIndex == i);
+        DrawCircleV({nodes[i].x, nodes[i].y}, kNodeRadius + 2.0f, selected ? Pal::NodeHL : Pal::NodeBorder);
+        DrawCircleV({nodes[i].x, nodes[i].y}, kNodeRadius, Pal::NodeFill);
+        Vector2 ts = MeasureTextEx(fontBold, nodes[i].label.c_str(), 17.0f, 1.0f);
+        DrawTextEx(fontBold, nodes[i].label.c_str(), {nodes[i].x - ts.x * 0.5f, nodes[i].y - ts.y * 0.5f}, 17.0f, 1.0f, Pal::TxtDark);
     }
 
-    // MST sum box in graph area corner
+    // Draw MST Box
     if (mstActive) {
         int currentSum = (mstCurrentStep > 0) ? mstSteps[mstCurrentStep - 1].cumulativeWeight : 0;
-        std::string orderText = FormatVisitOrder(mstVisitOrder, nodes, nodeCount);
-        char sumBuf[32];
-        std::snprintf(sumBuf, sizeof(sumBuf), "S = %d", currentSum);
+        char sumBuf[32]; std::snprintf(sumBuf, sizeof(sumBuf), "S = %d", currentSum);
         DrawRectangleRounded({12, 542, 270, 58}, 0.18f, 6, Pal::Surface);
         DrawRectangleRoundedLines({12, 542, 270, 58}, 0.18f, 6, Pal::Border);
         DrawTextEx(fontRegular, "MST Weight", {20, 548}, 11.0f, 1.0f, Pal::TxtLight);
         DrawTextEx(fontBold, sumBuf, {20, 564}, 19.0f, 1.0f, {46, 180, 90, 255});
-        DrawTextEx(fontRegular, orderText.c_str(), {88, 566}, 12.0f, 1.0f, Pal::TxtDark);
+        DrawTextEx(fontRegular, FormatVisitOrder(mstVisitOrder, nodes, nodeCount).c_str(), {88, 566}, 12.0f, 1.0f, Pal::TxtDark);
     }
+}
 
-    DrawRectangleRec({872, 86, 388, 516}, Pal::Panel);
-    DrawRectangleRoundedLines({872, 86, 388, 516}, 0.12f, 8, Pal::Border);
+void GraphScreen::DrawInputPanel() const {
+    DrawRectangleRec(kInputPanel, Pal::Panel);
+    DrawRectangleRoundedLines(kInputPanel, 0.12f, 8, Pal::Border);
 
     DrawModeTab(kTabEdge, "Edge List", inputMode == GraphInputMode::EdgeList);
     DrawModeTab(kTabMatrix, "Adjacency Matrix", inputMode == GraphInputMode::AdjacencyMatrix);
@@ -1208,40 +839,27 @@ void GraphScreen::Draw() const {
     DrawRectangleRounded(kInputContentArea, 0.12f, 8, Pal::Surface);
     DrawRectangleRoundedLines(kInputContentArea, 0.12f, 8, Pal::Border);
 
-    float maxScroll = GetInputMaxScroll();
-    float scrollY = inputScrollY;
-    if (scrollY < 0.0f) scrollY = 0.0f;
-    if (scrollY > maxScroll) scrollY = maxScroll;
-
-    int matrixDisplayN = std::min(nodeCount, 9);
+    float scrollY = std::clamp(inputScrollY, 0.0f, GetInputMaxScroll());
     BeginScissorMode((int)kInputClip.x, (int)kInputClip.y, (int)kInputClip.width, (int)kInputClip.height);
-    if (inputMode == GraphInputMode::EdgeList) {
-        DrawTextEx(fontBold, "No.", {kEdgeListSttX,  kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
-        DrawTextEx(fontBold, "U",  {kEdgeListUX,     kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
-        DrawTextEx(fontBold, "V",  {kEdgeListVX,     kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
-        DrawTextEx(fontBold, "W",  {kEdgeListWX,     kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
 
+    if (inputMode == GraphInputMode::EdgeList) {
+        DrawTextEx(fontBold, "No.", {kEdgeListSttX, kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, "U", {kEdgeListUX, kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, "V", {kEdgeListVX, kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
+        DrawTextEx(fontBold, "W", {kEdgeListWX, kEdgeListHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
         for (int i = 0; i < MAX_GRAPH_E; i++) {
-            char rowNo[8];
-            std::snprintf(rowNo, sizeof(rowNo), "%02d", i + 1);
+            char rowNo[8]; std::snprintf(rowNo, sizeof(rowNo), "%02d", i + 1);
             DrawTextEx(fontRegular, rowNo, {kEdgeListSttX, kEdgeListRowY + i * kEdgeListRowGap - scrollY + 2.0f}, 11.0f, 1.0f, Pal::TxtMid);
-            edgeFromFields[i].Draw();
-            edgeToFields[i].Draw();
-            edgeWeightFields[i].Draw();
+            edgeFromFields[i].Draw(); edgeToFields[i].Draw(); edgeWeightFields[i].Draw();
         }
     } else if (inputMode == GraphInputMode::AdjacencyMatrix) {
-        for (int c = 0; c < matrixDisplayN; c++) {
-            DrawTextEx(fontBold, nodes[c].label.c_str(), {kMatrixColX + c * kMatrixGap + 7.0f, kMatrixHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
-        }
-
-        for (int r = 0; r < matrixDisplayN; r++) {
+        int limit = std::min(nodeCount, 9);
+        for (int c = 0; c < limit; c++) DrawTextEx(fontBold, nodes[c].label.c_str(), {kMatrixColX + c * kMatrixGap + 7.0f, kMatrixHeaderY}, 11.0f, 1.0f, Pal::TxtLight);
+        for (int r = 0; r < limit; r++) {
             DrawTextEx(fontBold, nodes[r].label.c_str(), {910.0f, kMatrixRowY + r * kMatrixGap - scrollY + 3.0f}, 11.0f, 1.0f, Pal::TxtLight);
-            for (int c = 0; c < matrixDisplayN; c++) {
-                matrixFields[r][c].Draw();
-            }
+            for (int c = 0; c < limit; c++) matrixFields[r][c].Draw();
         }
     } else {
-
         for (int i = 0; i < nodeCount; i++) {
             DrawTextEx(fontBold, nodes[i].label.c_str(), {902.0f, kAdjRowY + i * kAdjRowGap - scrollY + 2.0f}, 11.0f, 1.0f, Pal::TxtMid);
             adjListFields[i].Draw();
@@ -1249,93 +867,69 @@ void GraphScreen::Draw() const {
     }
     EndScissorMode();
 
-    if (maxScroll > 0.0f) {
-        float thumbH = kScrollTrack.height * (kInputClip.height / GetInputContentHeight());
-        if (thumbH < 34.0f) thumbH = 34.0f;
-        float trackRange = kScrollTrack.height - thumbH;
-        float thumbY = kScrollTrack.y + trackRange * (scrollY / maxScroll);
-        Rectangle thumb = {kScrollTrack.x, thumbY, kScrollTrack.width, thumbH};
+    if (GetInputMaxScroll() > 0.0f) {
+        float thumbH = std::max(34.0f, kScrollTrack.height * (kInputClip.height / GetInputContentHeight()));
+        Rectangle thumb = {kScrollTrack.x, kScrollTrack.y + (kScrollTrack.height - thumbH) * (scrollY / GetInputMaxScroll()), kScrollTrack.width, thumbH};
         DrawRectangleRounded(kScrollTrack, 0.5f, 4, {72, 82, 106, 110});
         DrawRectangleRounded(thumb, 0.5f, 4, Pal::BtnPrimary);
     }
+}
 
+void GraphScreen::DrawBottomArea() const {
     DrawRectangleRec({0, 610, 1280, 110}, Pal::Panel);
     DrawLineEx({0, 610}, {1280, 610}, 1.0f, Pal::Border);
 
-    btnDelete.Draw();
-    btnChange.Draw();
-    btnAddNode.Draw();
-    btnAddEdge.Draw();
-    btnKruskal.Draw();
-    btnPrim.Draw();
-    btnLoadFile.Draw();
+    btnDelete.Draw(); btnChange.Draw(); btnAddNode.Draw(); btnAddEdge.Draw();
+    btnKruskal.Draw(); btnPrim.Draw(); btnLoadFile.Draw();
 
     if (mstActive) {
-        char stepBuf[48];
-        std::snprintf(stepBuf, sizeof(stepBuf), "Step %d / %d", mstCurrentStep, (int)mstSteps.size());
+        char stepBuf[48]; std::snprintf(stepBuf, sizeof(stepBuf), "Step %d / %d", mstCurrentStep, (int)mstSteps.size());
         DrawTextEx(fontRegular, stepBuf, {20, 694}, 13.0f, 1.0f, Pal::TxtMid);
     }
-
 
     if (msgTimer > 0.0f && !message.empty()) {
         Color c = msgColor;
         c.a = static_cast<unsigned char>((msgTimer < 0.5f ? msgTimer / 0.5f : 1.0f) * 220.0f);
         DrawTextEx(fontRegular, message.c_str(), {20, 702}, 14.2f, 1.0f, c);
     }
-
-    if (editDialogOpen) {
-        DrawRectangleRec({0, 0, 1280, 720}, {20, 28, 48, 110});
-        DrawRectangleRounded({300, 200, 680, 330}, 0.08f, 10, Pal::Surface);
-        DrawRectangleRoundedLines({300, 200, 680, 330}, 0.08f, 10, Pal::Border);
-
-        const char* dlgTitle = (editTarget == GraphEditTarget::NodeLabel)    ? "Edit Node"
-                             : (editTarget == GraphEditTarget::AddNodeLabel)  ? "Add Node"
-                             : (editTarget == GraphEditTarget::AddEdge) ? "Add Edge" : "Edit Edge";
-        const char* dlgHint  = (editTarget == GraphEditTarget::NodeLabel)    ? "Enter a new node label and confirm."
-                             : (editTarget == GraphEditTarget::AddNodeLabel)  ? "Enter a label for the new node."
-                             : (editTarget == GraphEditTarget::AddEdge) ? "Enter weight and both endpoints (From, To)."
-                             : "Enter a new edge weight and confirm.";
-        DrawTextEx(fontBold, dlgTitle, {360, 258}, 22.0f, 1.0f, Pal::TxtDark);
-        DrawTextEx(fontRegular, dlgHint, {360, 284}, 13.0f, 1.0f, Pal::TxtLight);
-        DrawLineEx({360, 448}, {920, 448}, 1.0f, Pal::Border);
-
-        if (editTarget == GraphEditTarget::AddEdge) {
-            DrawTextEx(fontRegular, "Weight", {360, 312}, 12.0f, 1.0f, Pal::TxtMid);
-            DrawTextEx(fontRegular, "From", {360, 394}, 12.0f, 1.0f, Pal::TxtMid);
-            DrawTextEx(fontRegular, "To", {648, 394}, 12.0f, 1.0f, Pal::TxtMid);
-        }
-
-        editField.Draw();
-        if (editTarget == GraphEditTarget::AddEdge) {
-            editFromField.Draw();
-            editToField.Draw();
-        }
-        btnEditOk.Draw();
-        btnEditCancel.Draw();
-    }
 }
 
-void GraphScreen::RunKruskal() {
-    for (auto& e : edges) {
-        e.inMST = false;
-        e.skipped = false;
-    }
+void GraphScreen::DrawEditDialog() const {
+    DrawRectangleRec({0, 0, 1280, 720}, {20, 28, 48, 110});
+    DrawRectangleRounded({300, 200, 680, 330}, 0.08f, 10, Pal::Surface);
+    DrawRectangleRoundedLines({300, 200, 680, 330}, 0.08f, 10, Pal::Border);
 
+    const char* dlgTitle = editTarget == GraphEditTarget::NodeLabel ? "Edit Node" : (editTarget == GraphEditTarget::AddNodeLabel ? "Add Node" : (editTarget == GraphEditTarget::AddEdge ? "Add Edge" : "Edit Edge"));
+    const char* dlgHint  = editTarget == GraphEditTarget::NodeLabel ? "Enter a new node label and confirm." : (editTarget == GraphEditTarget::AddNodeLabel ? "Enter a label for the new node." : (editTarget == GraphEditTarget::AddEdge ? "Enter weight and both endpoints (From, To)." : "Enter a new edge weight and confirm."));
+    
+    DrawTextEx(fontBold, dlgTitle, {360, 258}, 22.0f, 1.0f, Pal::TxtDark);
+    DrawTextEx(fontRegular, dlgHint, {360, 284}, 13.0f, 1.0f, Pal::TxtLight);
+    DrawLineEx({360, 448}, {920, 448}, 1.0f, Pal::Border);
+
+    if (editTarget == GraphEditTarget::AddEdge) {
+        DrawTextEx(fontRegular, "Weight", {360, 312}, 12.0f, 1.0f, Pal::TxtMid);
+        DrawTextEx(fontRegular, "From", {360, 394}, 12.0f, 1.0f, Pal::TxtMid);
+        DrawTextEx(fontRegular, "To", {648, 394}, 12.0f, 1.0f, Pal::TxtMid);
+        editFromField.Draw(); editToField.Draw();
+    }
+    editField.Draw();
+    btnEditOk.Draw(); btnEditCancel.Draw();
+}
+
+// ============================================================================
+// ALGORITHMS
+// ============================================================================
+void GraphScreen::RunKruskal() {
+    for (auto& e : edges) { e.inMST = false; e.skipped = false; }
     mstVisitOrder.clear();
 
     std::vector<int> order;
-    for (int i = 0; i < (int)edges.size(); i++) {
-        if (edges[i].visible) order.push_back(i);
-    }
-    std::sort(order.begin(), order.end(), [&](int a, int b) {
-        return edges[a].w < edges[b].w;
-    });
+    for (int i = 0; i < (int)edges.size(); i++) if (edges[i].visible) order.push_back(i);
+    std::sort(order.begin(), order.end(), [&](int a, int b) { return edges[a].w < edges[b].w; });
 
     std::vector<int> parent(nodeCount);
     std::iota(parent.begin(), parent.end(), 0);
-    std::function<int(int)> find = [&](int x) -> int {
-        return parent[x] == x ? x : parent[x] = find(parent[x]);
-    };
+    std::function<int(int)> find = [&](int x) -> int { return parent[x] == x ? x : parent[x] = find(parent[x]); };
 
     mstSteps.clear();
     int cumWeight = 0;
@@ -1347,81 +941,51 @@ void GraphScreen::RunKruskal() {
         if (added) {
             parent[pu] = pv;
             cumWeight += e.w;
-            if (std::find(mstVisitOrder.begin(), mstVisitOrder.end(), e.u) == mstVisitOrder.end()) {
-                mstVisitOrder.push_back(e.u);
-            }
-            if (std::find(mstVisitOrder.begin(), mstVisitOrder.end(), e.v) == mstVisitOrder.end()) {
-                mstVisitOrder.push_back(e.v);
-            }
+            if (std::find(mstVisitOrder.begin(), mstVisitOrder.end(), e.u) == mstVisitOrder.end()) mstVisitOrder.push_back(e.u);
+            if (std::find(mstVisitOrder.begin(), mstVisitOrder.end(), e.v) == mstVisitOrder.end()) mstVisitOrder.push_back(e.v);
         }
         mstSteps.push_back({idx, added, cumWeight});
     }
 
-    mstCurrentStep = 0;
-    mstActive = true;
-    mstStepTimer = 0.8f;
+    mstCurrentStep = 0; mstActive = true; mstStepTimer = 0.8f;
     SetMsg("Kruskal: running step by step...", Pal::TxtMid, 3.0f);
-
-
-
 }
 
 void GraphScreen::RunPrim() {
-    for (auto& e : edges) {
-        e.inMST = false;
-        e.skipped = false;
-    }
-
+    for (auto& e : edges) { e.inMST = false; e.skipped = false; }
     mstVisitOrder.clear();
 
-    int start = -1;
+    int start = -1, visibleCount = 0;
     for (int i = 0; i < nodeCount; i++) {
-        if (nodes[i].visible) { start = i; break; }
+        if (nodes[i].visible) { if (start == -1) start = i; visibleCount++; }
     }
-    if (start == -1) {
-        SetMsg("No visible nodes.", {200, 60, 60, 255}, 3.0f);
-        return;
-    }
+    if (start == -1) { SetMsg("No visible nodes.", {200, 60, 60, 255}, 3.0f); return; }
 
     std::vector<bool> inTree(nodeCount, false);
     inTree[start] = true;
     mstVisitOrder.push_back(start);
-    int visibleCount = 0;
-    for (int i = 0; i < nodeCount; i++) if (nodes[i].visible) visibleCount++;
-
     mstSteps.clear();
-    int cumWeight = 0;
-    int added = 0;
 
+    int cumWeight = 0, added = 0;
     while (added < visibleCount - 1) {
-        int bestIdx = -1;
-        int bestW = INT_MAX;
+        int bestIdx = -1, bestW = INT_MAX;
         for (int i = 0; i < (int)edges.size(); i++) {
             const GEdge& e = edges[i];
-            if (!e.visible || !nodes[e.u].visible || !nodes[e.v].visible) continue;
-            bool uIn = inTree[e.u], vIn = inTree[e.v];
-            if (uIn == vIn) continue;
-            if (e.w < bestW) {
-                bestW = e.w;
-                bestIdx = i;
-            }
+            if (!e.visible || !nodes[e.u].visible || !nodes[e.v].visible || inTree[e.u] == inTree[e.v]) continue;
+            if (e.w < bestW) { bestW = e.w; bestIdx = i; }
         }
         if (bestIdx == -1) break;
-        int u = edges[bestIdx].u;
-        int v = edges[bestIdx].v;
+
+        int u = edges[bestIdx].u, v = edges[bestIdx].v;
         int nextNode = inTree[u] ? v : u;
-        inTree[u] = true;
-        inTree[v] = true;
-        if (nextNode >= 0 && nextNode < nodeCount) {
-            mstVisitOrder.push_back(nextNode);
-        }
+        inTree[u] = inTree[v] = true;
+        if (nextNode >= 0 && nextNode < nodeCount) mstVisitOrder.push_back(nextNode);
+
         cumWeight += edges[bestIdx].w;
         mstSteps.push_back({bestIdx, true, cumWeight});
         added++;
     }
 
-    mstCurrentStep = 0;
-    mstActive = true;
-    mstStepTimer = 0.8f;
+    mstCurrentStep = 0; mstActive = true; mstStepTimer = 0.8f;
     SetMsg("Prim: running step by step...", Pal::TxtMid, 3.0f);
 }

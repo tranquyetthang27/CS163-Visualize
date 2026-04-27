@@ -121,4 +121,21 @@ public:
     GraphScreen();
     Screen Update();
     void Draw() const;
+
+private:
+    void UpdateMessages(float dt);
+    void UpdateTabsAndScroll();
+    void UpdateInputFields();
+    void HandleGraphInteraction(Vector2 mouse);
+    void HandleButtons();
+    void HandleDialogUpdate();
+    void UpdateMSTAnimation(float dt);
+    void LoadGraphFromFile();
+
+    void DrawHeader() const;
+    void DrawGraphView() const;
+    void DrawInputPanel() const;
+    void DrawBottomArea() const;
+    void DrawEditDialog() const;
+
 };
