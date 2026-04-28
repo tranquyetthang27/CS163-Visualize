@@ -1,15 +1,4 @@
-6 8
-A
-B
-C
-D
-E
-F
-A B 4
-A C 2
-B C 5
-B D 10
-C E 3
-D E 4
-D F 11
-E F 1
+ABCD
+abcd
+ab
+ef
