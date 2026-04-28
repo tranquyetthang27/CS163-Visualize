@@ -56,7 +56,7 @@ private:
 
     void DrawAllEdges(int node);
     void DrawAllNodes(int node);
-    
+
     void InstantInsert(const std::string& word);
     bool InstantSearch(const std::string& word);
     void OnLoadFileTriggered(const std::string& path);
@@ -66,4 +66,10 @@ private:
 
     void Delete(const std::string& word);
     bool IsValidChild(int parent, int charIdx);
+
+    Button btnToggleCode;
+    bool showPseudoCode = false;
+    int lastCodeOp = 0; // 0=insert, 1=search, 2=delete
+    int GetPseudoCodeLine() const;
+    void DrawCodePanel() const;
 };

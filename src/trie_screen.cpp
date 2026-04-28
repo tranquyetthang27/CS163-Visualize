@@ -12,6 +12,47 @@ static constexpr float TRIE_TOP_Y  = 140.0f;
 static constexpr float TRIE_DY     = 80.0f;
 static constexpr float NODE_R      = 20.0f;
 
+static constexpr Rectangle kCodePanel   = {874.0f, 78.0f, 390.0f, 252.0f};
+static constexpr float     kCodeLineGap = 21.0f;
+
+static constexpr const char* kInsertCode[] = {
+    "node = root",
+    "for c in word:",
+    "    idx = ord(c)",
+    "    if not children[idx]:",
+    "        children[idx] = NewNode(c)",
+    "    node = children[idx]",
+    "    node.count += 1",
+    "node.isEnd += 1"
+};
+static constexpr int kInsertCodeN = 8;
+
+static constexpr const char* kSearchCode[] = {
+    "node = root",
+    "for c in word:",
+    "    idx = ord(c)",
+    "    if not children[idx]:",
+    "        return Not Found",
+    "    node = children[idx]",
+    "if node.isEnd > 0:",
+    "    return Found",
+    "return Prefix only"
+};
+static constexpr int kSearchCodeN = 9;
+
+static constexpr const char* kDeleteCode[] = {
+    "Search word first",
+    "node = root",
+    "for c in word:",
+    "    next = children[idx]",
+    "    next.count -= 1",
+    "    if next.count == 0:",
+    "        children[idx] = null",
+    "    node = next",
+    "node.isEnd -= 1"
+};
+static constexpr int kDeleteCodeN = 9;
+
 TrieScreen::TrieScreen()
     : btnInsert({20,  636, 80,  40}, "Insert",    Pal::BtnPrimary, Pal::BtnPrimHov),
       btnClear  ({110, 636, 80,  40}, "Clear",     Pal::BtnDanger,  Pal::BtnDangHov),
@@ -21,6 +62,7 @@ TrieScreen::TrieScreen()
       btnLoad   ({650, 636, 110, 40}, "Load File", Pal::BtnNeutral, Pal::BtnNeutHov),
       btnBack   ({20,  20,  100, 36}, "< Back",    Pal::BtnNeutral, Pal::BtnNeutHov),
       btnDelete ({780, 636, 110, 40}, "Delete", Pal::BtnNeutral, Pal::BtnNeutHov),
+      btnToggleCode({1100, 18, 160, 36}, "Show Code", Pal::BtnNeutral, Pal::BtnNeutHov),
       msgTimer(0), msgColor(Pal::BtnSuccess), root(0)
 {
     camera.target = (Vector2){ 640, TRIE_TOP_Y };
@@ -104,15 +146,18 @@ Screen TrieScreen::Update() {
 
     if (btnToggleMode.Update()) {
         isStepByStep = !isStepByStep;
-        
+
         if (isStepByStep) {
             btnToggleMode.label = "Mode: Step";
-            btnToggleMode.baseColor = Pal::BtnNeutral; 
+            btnToggleMode.baseColor = Pal::BtnNeutral;
         } else {
             btnToggleMode.label = "Mode: Instant";
-            btnToggleMode.baseColor = Pal::BtnPrimary; 
+            btnToggleMode.baseColor = Pal::BtnPrimary;
         }
     }
+
+    btnToggleCode.label = showPseudoCode ? "Hide Code" : "Show Code";
+    if (btnToggleCode.Update()) showPseudoCode = !showPseudoCode;
 
     if (isAnimating || isSearching) {
         stepTimer += dt;
@@ -188,8 +233,9 @@ Screen TrieScreen::Update() {
     if(clickDelete && !input.IsEmpty()){
         std::string clean;
         clean = input.text;
-        
+
         if(!clean.empty()){
+            lastCodeOp = 2;
             if (isStepByStep) {
                 isDeletingStep = true;
                 StartSearch(clean);
@@ -220,13 +266,15 @@ Screen TrieScreen::Update() {
 
         if (!clean.empty()) {
             if (isStepByStep) {
-                if (clickInsert) StartInsert(clean);
-                else StartSearch(clean);
+                if (clickInsert) { lastCodeOp = 0; StartInsert(clean); }
+                else             { lastCodeOp = 1; StartSearch(clean); }
             } else {
                 if (clickInsert) {
+                    lastCodeOp = 0;
                     InstantInsert(clean);
                     SetMsg("Inserted (Instant)");
                 } else {
+                    lastCodeOp = 1;
                     InstantSearch(clean);
                 }
             }
@@ -338,6 +386,62 @@ void TrieScreen::DrawAllNodes(int node){
     }
 }
 
+int TrieScreen::GetPseudoCodeLine() const {
+    if (isAnimating) {
+        if (currentIdx < (int)pendingWord.size()) return 5; // node = children[idx]
+        return 7;                                           // node.isEnd += 1
+    }
+    if (isSearching) {
+        if (isDeletingStep) {
+            if (currentIdx < (int)pendingWord.size()) return 3; // next = children[idx]
+            return 8;                                           // node.isEnd -= 1
+        } else {
+            if (currentIdx < (int)pendingWord.size()) return 5; // node = children[idx]
+            return 6;                                           // if node.isEnd > 0
+        }
+    }
+    return -1;
+}
+
+void TrieScreen::DrawCodePanel() const {
+    int op = lastCodeOp;
+    if (isAnimating)              op = 0;
+    else if (isSearching && !isDeletingStep) op = 1;
+    else if (isSearching && isDeletingStep)  op = 2;
+
+    const char* const* code;
+    int count;
+    const char* title;
+    switch (op) {
+        case 1:  code = kSearchCode; count = kSearchCodeN; title = "Search"; break;
+        case 2:  code = kDeleteCode; count = kDeleteCodeN; title = "Delete"; break;
+        default: code = kInsertCode; count = kInsertCodeN; title = "Insert"; break;
+    }
+
+    int highlight = GetPseudoCodeLine();
+
+    DrawRectangleRounded(kCodePanel, 0.06f, 8, Color{20, 28, 50, 235});
+    DrawRectangleRoundedLines(kCodePanel, 0.06f, 8, Color{78, 93, 124, 255});
+    DrawTextEx(fontBold, title,
+               {kCodePanel.x + 12.0f, kCodePanel.y + 10.0f},
+               13.0f, 1.0f, Color{197, 209, 228, 255});
+
+    float baseY = kCodePanel.y + 36.0f;
+    for (int i = 0; i < count; i++) {
+        bool active = (i == highlight);
+        if (active) {
+            DrawRectangleRounded(
+                {kCodePanel.x + 8.0f, baseY + i * kCodeLineGap - 3.0f,
+                 kCodePanel.width - 16.0f, 20.0f},
+                0.12f, 6, Color{47, 88, 67, 235});
+        }
+        DrawTextEx(fontRegular, code[i],
+                   {kCodePanel.x + 16.0f, baseY + i * kCodeLineGap},
+                   12.5f, 1.0f,
+                   active ? Color{184, 250, 202, 255} : Color{166, 178, 203, 255});
+    }
+}
+
 void TrieScreen::Draw(){
     ClearBackground(Pal::BG);
 
@@ -350,9 +454,12 @@ void TrieScreen::Draw(){
     DrawLineEx({0, 72}, {1280, 72}, 1.0f, Pal::Border);
     DrawTextEx(fontBold, "Trie Visualization", {130, 20}, 28.0f, 1.0f, Pal::TxtDark);
     DrawTextEx(fontRegular, "Insert words to build the tree and search prefixes", {130, 52}, 14.0f, 1.0f, Pal::TxtLight);
-    
+
     DrawCircleV({820, 45}, 7, Pal::NodeFound);
     DrawTextEx(fontRegular, "= End of Word", {835, 38}, 14.0f, 1.0f, Pal::TxtMid);
+
+    btnToggleCode.Draw();
+    if (showPseudoCode) DrawCodePanel();
 
     DrawRectangleRec({0, 616, 1280, 104}, Pal::Panel);
     DrawLineEx({0, 616}, {1280, 616}, 1.0f, Pal::Border);
