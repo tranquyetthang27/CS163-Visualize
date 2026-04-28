@@ -65,3 +65,15 @@ std::vector<int> InitFile::loadNumbers(const std::string& filePath) {
     file.close();
     return result;
 }
+
+bool InitFile::saveWords(const std::string& filePath, const std::vector<std::string>& words) {
+    std::ofstream file(filePath);
+    if (!file.is_open()) return false;
+
+    for (const auto& word : words) {
+        file << word << "\n";
+    }
+
+    file.close();
+    return true;
+}
