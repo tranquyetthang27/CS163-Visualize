@@ -4,6 +4,7 @@
 #include "font.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
 #include <iterator>
 #include <cstdio>
@@ -12,6 +13,7 @@
 #include <numeric>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace {
 constexpr float kNodeRadius = 22.0f;
@@ -94,6 +96,12 @@ std::string FormatVisitOrder(const std::vector<int>& order, const GNode* nodes, 
         text += nodes[idx].label;
     }
     return text.empty() ? "-" : text;
+}
+
+std::uint64_t MakeUndirectedEdgeKey(int u, int v) {
+    if (u > v) std::swap(u, v);
+    return (static_cast<std::uint64_t>(static_cast<unsigned int>(u)) << 32) |
+           static_cast<std::uint64_t>(static_cast<unsigned int>(v));
 }
 
 void DrawModeTab(Rectangle rect, const char* label, bool active) {
@@ -241,18 +249,23 @@ void GraphScreen::SetInputMode(GraphInputMode mode) {
 void GraphScreen::SyncFieldsFromGraph(bool clearFocus) {
     if (clearFocus) ClearInputFocus();
 
+    for (int i = 0; i < MAX_GRAPH_E; i++) {
+        edgeFromFields[i].Clear();
+        edgeToFields[i].Clear();
+        edgeWeightFields[i].Clear();
+    }
+
     int visibleEdgeCount = 0;
     for (int i = 0; i < static_cast<int>(edges.size()); i++) {
-        edgeFromFields[i].Clear(); edgeToFields[i].Clear(); edgeWeightFields[i].Clear();
         if (edges[i].visible) {
-            edgeFromFields[visibleEdgeCount].text   = nodes[edges[i].u].label;
-            edgeToFields[visibleEdgeCount].text     = nodes[edges[i].v].label;
-            edgeWeightFields[visibleEdgeCount].text = std::to_string(edges[i].w);
-            visibleEdgeCount++;
+            int row = visibleEdgeCount++;
+            if (row >= MAX_GRAPH_E) break;
+            int u = std::min(edges[i].u, edges[i].v);
+            int v = std::max(edges[i].u, edges[i].v);
+            edgeFromFields[row].text   = nodes[u].label;
+            edgeToFields[row].text     = nodes[v].label;
+            edgeWeightFields[row].text = std::to_string(edges[i].w);
         }
-    }
-    for (int i = visibleEdgeCount; i < MAX_GRAPH_E; i++) {
-        edgeFromFields[i].Clear(); edgeToFields[i].Clear(); edgeWeightFields[i].Clear();
     }
 
     for (int r = 0; r < nodeCount; r++) {
@@ -263,10 +276,10 @@ void GraphScreen::SyncFieldsFromGraph(bool clearFocus) {
     for (const auto& edge : edges) {
         if (!edge.visible || edge.u >= nodeCount || edge.v >= nodeCount) continue;
         matrixFields[edge.u][edge.v].text = matrixFields[edge.v][edge.u].text = std::to_string(edge.w);
-        if (!rows[edge.u].empty()) rows[edge.u] += ' ';
-        rows[edge.u] += nodes[edge.v].label + "," + std::to_string(edge.w);
-        if (!rows[edge.v].empty()) rows[edge.v] += ' ';
-        rows[edge.v] += nodes[edge.u].label + "," + std::to_string(edge.w);
+        int row = std::min(edge.u, edge.v);
+        int neighbor = std::max(edge.u, edge.v);
+        if (!rows[row].empty()) rows[row] += ' ';
+        rows[row] += nodes[neighbor].label + "," + std::to_string(edge.w);
     }
     for (int i = 0; i < nodeCount; i++) adjListFields[i].text = rows[i];
 }
@@ -274,8 +287,12 @@ void GraphScreen::SyncFieldsFromGraph(bool clearFocus) {
 bool GraphScreen::ApplyInputToGraph(bool showMessage) {
     std::vector<GEdge> nextEdges;
     std::unordered_map<int, std::string> renameMap;
+    std::unordered_set<uint64_t> seenEdges;
     auto addEdge = [&](int u, int v, int w) {
         if (u >= 0 && v >= 0 && u < nodeCount && v < nodeCount && u != v) {
+            uint64_t key = MakeUndirectedEdgeKey(u, v);
+            if (!seenEdges.insert(key).second) return;
+            if (u > v) std::swap(u, v);
             nextEdges.push_back({u, v, w, true});
         }
     };
@@ -394,7 +411,7 @@ bool GraphScreen::ApplyInputToGraph(bool showMessage) {
                         if (showMessage) SetMsg("Adjacency List: use label,weight (e.g. B,7).", Pal::BtnDanger, 2.5f);
                         return false;
                     }
-                    if (neighbor > r) addEdge(r, neighbor, weight);
+                    addEdge(r, neighbor, weight);
                 }
             }
             break;
