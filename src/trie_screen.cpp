@@ -573,6 +573,9 @@ void TrieScreen::Delete(const std::string& word) {
     SetMsg("Word instance deleted!", Pal::BtnSuccess);
 }
 bool TrieScreen::IsValidChild(int parent, int charIdx) {
+    if (parent < 0 || parent >= (int)pool.size()) return false;
+    if (charIdx < 0 || charIdx >= 26) return false;
+
     int child = pool[parent].children[charIdx];
     return (child != -1 && pool[child].cnt > 0);
 }
