@@ -57,10 +57,7 @@ int main() {
                 case Screen::Settings:   settingsScreen = SettingsScreen();   break;
                 case Screen::About:      aboutScreen    = AboutScreen();      break;
                 case Screen::Home:       homeScreen     = HomeScreen();       break;
-                case Screen::LinkedList: llScreen.Reset(); break;
-                case Screen::Trie:       trieScreen     = TrieScreen();       break;
-                case Screen::Heap:       heapScreen     = HeapScreen();       break;
-                case Screen::MST:        mstScreen      = GraphScreen();      break;
+                // Data structure screens preserve their state when navigating back
                 default: break;
             }
             current = next;
