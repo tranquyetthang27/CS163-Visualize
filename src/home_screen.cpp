@@ -41,9 +41,9 @@ Screen HomeScreen::Update() {
 void HomeScreen::Draw() const {
     ClearBackground(gSettings.GetBG());
 
-    DrawTextCentered(fontBold,    "VisuAlgo",
+    DrawTextCentered(fontBold,    "Data Structure",
                      42.0f, 38.0f, Pal::TxtDark);
-    DrawTextCentered(fontRegular, "Select a visualizer module",
+    DrawTextCentered(fontRegular, "Visualising data structures and algorithms through animation",
                      90.0f, 17.0f, Pal::TxtMid);
 
     btnBack.Draw();
