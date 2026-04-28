@@ -165,6 +165,19 @@ cmake --build .
 - Application runs at 1280x720 pixels by default and supports resizing
 - Audio device must be initialized to use audio features
 
+## AI Usage Declaration
+
+This project used AI assistance in a limited and supervised way to support development. The team treated AI as a reference tool, not as an automatic source of final answers or implementation.
+
+AI was mainly used for:
+
+- Quickly checking raylib-related functions and usage patterns
+- Understanding the overall project structure and file responsibilities
+- Reviewing implementation ideas for the visualized data structure screens
+- Helping the team verify whether a proposed approach matched the current codebase
+
+AI was not used to make final project decisions. All core code, UI behavior, screen flow, and data structure visualization logic were reviewed, adjusted, and approved by the team before being kept in the project.
+
 ## License
 
 This project uses the raylib library. Please see LICENSE in the raylib/ directory.
