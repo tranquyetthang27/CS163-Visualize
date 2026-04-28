@@ -173,6 +173,7 @@ Screen HeapScreen::Update() {
                 char buf[32]; 
                 snprintf(buf, sizeof(buf), "Inserted %d.", heap[idCurrent]);
                 SetMsg(buf);
+                return Screen:: Heap;
             } else {
                 int parent = (idCurrent - 1) >> 1;
                 animA = idCurrent;
@@ -195,6 +196,9 @@ Screen HeapScreen::Update() {
                         snprintf(buf, sizeof(buf), "Inserted %d.", heap[idCurrent]);
                         idCurrent = 0;
                         SetMsg(buf);
+                        animA = animB = animB = -1;
+                        ComputePositions();
+                        return Screen::Heap;
                     }
                 }
             }
